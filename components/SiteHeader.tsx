@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight, List, X } from "@phosphor-icons/react";
 import { useState } from "react";
 import { primaryNav } from "@/lib/site-data";
@@ -10,8 +11,9 @@ export function SiteHeader() {
 
   return (
     <header className="site-header">
-      <Link className="wordmark" href="/" aria-label="Sai Zhao Fragrance home" onClick={() => setOpen(false)}>
-        <span>SAI ZHAO</span><small>FRAGRANCE</small>
+      <Link className="logo-lockup" href="/" aria-label="Sai Zhao Fragrance home" onClick={() => setOpen(false)}>
+        <Image src="/images/sai-zhao-logo.png" alt="Sai Zhao Fragrance" width={96} height={96} priority />
+        <span>Sai Zhao<br /><small>FRAGRANCE</small></span>
       </Link>
       <button className="menu-toggle" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle menu">
         {open ? <X size={24} /> : <List size={24} />}

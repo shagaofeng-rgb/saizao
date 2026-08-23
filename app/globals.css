@@ -21,6 +21,9 @@ button { cursor: pointer; }
 .wordmark { display: inline-flex; flex-direction: column; line-height: .86; letter-spacing: .11em; min-width: 185px; font-family: Georgia, 'Times New Roman', serif; }
 .wordmark span { font-size: 22px; }
 .wordmark small { margin-top: 7px; font-size: 10px; letter-spacing: .18em; }
+.logo-lockup { display: inline-flex; align-items: center; gap: 10px; min-width: 185px; font-family: Georgia, 'Times New Roman', serif; font-size: 19px; letter-spacing: .08em; line-height: .9; }
+.logo-lockup img { width: 49px; height: 49px; object-fit: contain; }
+.logo-lockup small { display: inline-block; margin-top: 7px; font-family: Arial, Helvetica, sans-serif; font-size: 9px; letter-spacing: .16em; }
 .nav { display: flex; align-items: center; justify-content: center; gap: clamp(17px, 2vw, 38px); flex: 1; font-size: 12px; }
 .nav a { border-bottom: 1px solid transparent; padding: 8px 0; transition: border-color .2s ease; }
 .nav a:hover, .nav a:focus-visible { border-color: var(--clay); outline: 0; }
@@ -76,6 +79,16 @@ h1 { margin-bottom: 22px; max-width: 550px; font-size: clamp(57px, 6.2vw, 104px)
 .quality-image { position: relative; min-height: 450px; overflow: hidden; }
 
 .markets { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 30px; align-items: center; }
+.company-showcase { padding-top: 48px; }
+.section-heading { max-width: 630px; margin-bottom: 35px; }
+.section-heading h2 { margin-bottom: 12px; font-size: clamp(39px, 4vw, 64px); letter-spacing: -.065em; line-height: 1.02; }
+.section-heading > p:not(.eyebrow) { color: var(--muted); font-size: 15px; line-height: 1.6; }
+.company-showcase-grid { display: grid; grid-template-columns: 1.28fr .72fr; gap: 14px; }
+.showcase-stack { display: grid; grid-template-rows: 1fr 1fr; gap: 14px; }
+.showcase-card { position: relative; min-height: 265px; overflow: hidden; border-radius: 18px; background: var(--ink); }
+.showcase-campus { min-height: 544px; }
+.showcase-card::after { position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(28, 19, 15, .74)); content: ""; pointer-events: none; }
+.showcase-card span { position: absolute; right: 25px; bottom: 22px; z-index: 1; display: inline-flex; align-items: center; gap: 9px; color: #fffaf4; font-size: 14px; font-weight: 700; }
 .markets-copy { padding-right: 20px; }
 .markets-copy h2 { font-size: clamp(34px, 3.1vw, 53px); }
 .text-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 12px; border: 1px solid var(--clay); border-radius: 999px; color: var(--clay); padding: 10px 15px; font-size: 12px; font-weight: 700; }
@@ -97,6 +110,8 @@ h1 { margin-bottom: 22px; max-width: 550px; font-size: clamp(57px, 6.2vw, 104px)
 .footer > div:not(.footer-brand) { display: flex; flex-direction: column; gap: 10px; }
 .footer a, .footer p { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .footer-brand .wordmark { margin-bottom: 18px; }
+.footer-brand .logo-lockup { margin-bottom: 18px; }
+.footer-brand .logo-lockup img { width: 58px; height: 58px; }
 .footer-brand p { max-width: 180px; }
 .footer-note { max-width: 180px; color: #987e6d !important; }
 
@@ -149,6 +164,22 @@ h1 { margin-bottom: 22px; max-width: 550px; font-size: clamp(57px, 6.2vw, 104px)
 .market-story > img { width: 100%; height: auto; }
 .market-story h2 { font-size: clamp(37px, 4vw, 61px); letter-spacing: -.06em; line-height: 1.05; }
 .market-story p:not(.eyebrow) { color: var(--muted); font-size: 15px; line-height: 1.6; }
+.facility-gallery { padding-top: 38px; }
+.facility-gallery-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; }
+.facility-gallery figure, .production-gallery figure, .event-gallery figure, .facility-feature figure { position: relative; min-height: 285px; overflow: hidden; margin: 0; border-radius: 17px; background: var(--paper-deep); }
+.facility-gallery .gallery-wide { grid-row: span 2; min-height: 585px; }
+.facility-gallery figcaption, .production-gallery figcaption { position: absolute; right: 0; bottom: 0; left: 0; padding: 36px 22px 17px; background: linear-gradient(transparent, rgba(30, 20, 15, .72)); color: #fffaf4; font-size: 13px; font-weight: 700; }
+.facility-feature { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; align-items: center; padding: 82px 8vw; background: #f0e3d5; }
+.facility-feature h2 { margin-bottom: 17px; font-size: clamp(37px, 3.8vw, 59px); letter-spacing: -.06em; line-height: 1.05; }
+.facility-feature p:not(.eyebrow) { max-width: 480px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+.facility-feature figure { min-height: 410px; border-top-left-radius: 105px; }
+.production-gallery { padding-top: 36px; }
+.production-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.production-gallery figure { min-height: 360px; }
+.event-gallery { padding-top: 34px; }
+.event-gallery-grid { display: grid; grid-template-columns: 1.3fr .85fr .85fr; gap: 14px; }
+.event-gallery figure { min-height: 305px; }
+.event-gallery .event-feature { min-height: 625px; }
 .resource-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding-top: 0; }
 .resource-feature { background: #d8b58e !important; }
 .faq-list { max-width: 990px; padding-top: 0; }
@@ -222,6 +253,13 @@ h1 { margin-bottom: 22px; max-width: 550px; font-size: clamp(57px, 6.2vw, 104px)
   .page-hero-image { min-height: 390px; border-bottom-left-radius: 45% 12%; }
   .content-section { padding: 74px 27px; }
   .two-column, .market-story, .quote-page { grid-template-columns: 1fr; gap: 32px; }
+  .company-showcase-grid, .facility-feature, .facility-gallery-grid, .event-gallery-grid { grid-template-columns: 1fr; }
+  .showcase-campus, .showcase-card, .facility-gallery .gallery-wide, .facility-gallery figure, .event-gallery figure, .event-gallery .event-feature { min-height: 310px; }
+  .showcase-stack { grid-template-rows: none; grid-template-columns: 1fr; }
+  .facility-feature { gap: 30px; padding: 70px 27px; }
+  .facility-feature figure { min-height: 320px; }
+  .production-gallery-grid { grid-template-columns: 1fr; }
+  .production-gallery figure { min-height: 300px; }
   .feature-band, .contact-grid { grid-template-columns: 1fr; }
   .feature-band > div { min-height: 0; padding: 35px 27px; }
   .capability-grid, .listing-grid, .resource-grid { grid-template-columns: 1fr; }
