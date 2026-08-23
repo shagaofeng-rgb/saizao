@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle } from "@/components/UiIcons";
 import { notFound } from "next/navigation";
 import { PageHero } from "@/components/PageHero";
 import { SiteFooter } from "@/components/SiteFooter";

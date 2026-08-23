@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight } from "@phosphor-icons/react";
+import { ArrowUpRight } from "@/components/UiIcons";
 
 export function PageHero({ eyebrow, title, intro, image, cta = true }: { eyebrow: string; title: string; intro: string; image: string; cta?: boolean }) {
   return (

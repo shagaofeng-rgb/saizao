@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, CheckCircle, Flask, GlobeHemisphereWest, Sparkle } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUpRight, CheckCircle, Flask, GlobeHemisphereWest, Sparkle } from "@/components/UiIcons";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { applications } from "@/lib/site-data";
