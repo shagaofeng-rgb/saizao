@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
+import { PageHero } from "@/components/PageHero";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
+
+export const metadata: Metadata = { title: "Sourcing & Quality | Sai Zhao", description: "See the quality-minded route Sai Zhao takes from brief through sampling and production discussion." };
+export default function QualityPage() { const steps = ["Define the application and product context", "Establish the scent direction and sample plan", "Review feedback and refine the next sample", "Align on the agreed next production step"]; return <main><SiteHeader /><PageHero eyebrow="SOURCING & QUALITY" title="Quality is a process you can follow." intro="A clear, documented conversation helps keep fragrance development, evaluation and supply planning connected." image="/images/sai-zhao-factory-gate.png" /><section className="content-section two-column"><div><p className="eyebrow">OUR WORKING PRINCIPLE</p><h2>Clarity at every handover.</h2></div><div><p>Quality claims, certifications and performance information should always be tied to the specific product, market and documentation available for your project.</p><p>That is why our public site separates a broad capability overview from the project-specific materials supplied during an inquiry.</p></div></section><section className="timeline-section"><p className="eyebrow">A DISCIPLINED ROUTE</p>{steps.map((step, index) => <article key={step}><span>0{index + 1}</span><h2>{step}</h2><CheckCircle size={23} /></article>)}</section><section className="centered-cta"><h2>Need a quality or documentation discussion for your project?</h2><Link className="button" href="/contact">Contact our team <ArrowRight size={18} /></Link></section><SiteFooter /></main>; }
