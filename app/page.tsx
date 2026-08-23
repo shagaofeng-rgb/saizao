@@ -4,10 +4,9 @@ import Image from "next/image";
 import {
   ArrowRight,
   ArrowUpRight,
-  Beaker,
   CheckCircle,
   GlobeHemisphereWest,
-  Handshake,
+  Flask,
   Leaf,
   List,
   Package,
@@ -27,7 +26,7 @@ const applications = [
     title: "Candle",
     text: "Scent development for memorable warm and cold throw.",
     image: "/images/application-candle.png",
-    icon: Beaker,
+    icon: Flask,
   },
   {
     title: "Diffuser",
@@ -89,7 +88,7 @@ export default function Home() {
             <a className="button" href="#brief">Share Your Brief <ArrowUpRight size={18} /></a>
             <div className="proof-row" aria-label="Core strengths">
               <span><Sparkle size={20} /> Application-led<br />development</span>
-              <span><Beaker size={20} /> End-to-end<br />customization</span>
+              <span><Flask size={20} /> End-to-end<br />customization</span>
               <span><CheckCircle size={20} /> Quality-focused<br />production</span>
               <span><GlobeHemisphereWest size={20} /> Export-ready<br />support</span>
             </div>
