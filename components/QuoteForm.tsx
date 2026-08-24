@@ -11,6 +11,10 @@ export function QuoteForm() {
     event.preventDefault();
     setStatus("sending");
     const form = new FormData(event.currentTarget);
+    const url = new URL(window.location.href);
+    form.set("pagePath", url.pathname);
+    form.set("referrer", document.referrer);
+    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((key) => form.set(key, url.searchParams.get(key) ?? ""));
     const response = await fetch("/api/request-a-quote", { method: "POST", body: form });
     const result = await response.json();
     if (response.ok) { setStatus("sent"); setMessage(result.message); event.currentTarget.reset(); }
