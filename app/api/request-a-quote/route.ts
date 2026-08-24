@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       campaign: text(form, "utm_campaign", 220) || null,
       term: text(form, "utm_term", 220) || null,
       content: text(form, "utm_content", 220) || null,
+      anonymous_id: text(form, "anonymousId", 100) || null,
     });
   } catch {
     return Response.json({ message: "We could not save your request right now. Please call +86 137 0178 0563." }, { status: 503 });

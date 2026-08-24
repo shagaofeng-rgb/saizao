@@ -3,6 +3,10 @@
 import { FormEvent, useState } from "react";
 import { ArrowUpRight, CheckCircle } from "@phosphor-icons/react";
 
+function visitorId() {
+  return document.cookie.split("; ").find((value) => value.startsWith("sz_visitor_id="))?.split("=")[1] ?? "";
+}
+
 export function QuoteForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -14,6 +18,7 @@ export function QuoteForm() {
     const url = new URL(window.location.href);
     form.set("pagePath", url.pathname);
     form.set("referrer", document.referrer);
+    form.set("anonymousId", visitorId());
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((key) => form.set(key, url.searchParams.get(key) ?? ""));
     const response = await fetch("/api/request-a-quote", { method: "POST", body: form });
     const result = await response.json();
