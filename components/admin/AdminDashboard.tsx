@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Metrics = { visitors: number; sessions: number; pageViews: number; leads: number; excluded: number };
-type Visitor = { anonymousId: string; country: string; source: string; visits: number; lastSeen: string; latestPage: string; classification: string };
+type Visitor = { anonymousId: string; country: string; source: string; visits: number; lastSeen: string; latestPage: string; classification: string; ipMasked: string };
 type Lead = { name: string; company: string; country: string; source: string; createdAt: string; status: string };
 type Dashboard = { metrics: Metrics; countries: { label: string; value: number }[]; sources: { label: string; value: number }[]; pages: { label: string; value: number }[]; visitors: Visitor[]; visitorTotal: number; leads: Lead[] };
 
@@ -88,7 +88,7 @@ export function AdminDashboard() {
 
           <section id="visitors" className="admin-panel">
             <div className="admin-panel-heading"><div><p className="admin-kicker">VERIFIED VISITORS</p><h2>真实访客与访问轨迹</h2></div><label>每页<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={25}>25 条</option><option value={50}>50 条</option><option value={100}>100 条</option></select></label></div>
-            <div className="admin-table-scroll"><table><thead><tr><th>访客</th><th>国家</th><th>来源</th><th>访问次数</th><th>最近页面</th><th>最近访问</th><th>分类</th></tr></thead><tbody>{data.visitors.length ? data.visitors.map((visitor) => <tr key={visitor.anonymousId}><td>{visitor.anonymousId}</td><td>{visitor.country || "Unknown"}</td><td>{visitor.source || "Direct"}</td><td>{visitor.visits}</td><td className="admin-path">{visitor.latestPage}</td><td>{visitor.lastSeen}</td><td><span className="admin-tag">{visitor.classification}</span></td></tr>) : <tr><td colSpan={7} className="admin-empty">当前筛选条件下暂无有效访问。</td></tr>}</tbody></table></div>
+            <div className="admin-table-scroll"><table><thead><tr><th>访客</th><th>国家</th><th>脱敏 IP</th><th>来源</th><th>访问次数</th><th>最近页面</th><th>最近访问</th><th>分类</th></tr></thead><tbody>{data.visitors.length ? data.visitors.map((visitor) => <tr key={visitor.anonymousId}><td>{visitor.anonymousId}</td><td>{visitor.country || "Unknown"}</td><td>{visitor.ipMasked || "—"}</td><td>{visitor.source || "Direct"}</td><td>{visitor.visits}</td><td className="admin-path">{visitor.latestPage}</td><td>{visitor.lastSeen}</td><td><span className="admin-tag">{visitor.classification}</span></td></tr>) : <tr><td colSpan={8} className="admin-empty">当前筛选条件下暂无有效访问。</td></tr>}</tbody></table></div>
             <div className="admin-pagination"><span>共 {data.visitorTotal} 位访客 · 第 {page} / {totalPages} 页</span><div><button disabled={page === 1} onClick={() => setPage((value) => value - 1)}>上一页</button><button disabled={page === totalPages} onClick={() => setPage((value) => value + 1)}>下一页</button></div></div>
           </section>
 

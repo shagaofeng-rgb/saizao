@@ -171,7 +171,7 @@ security definer
 set search_path = public
 as $$
 with selected_sessions as (
-  select s.*, v.anonymous_id
+  select s.*, v.anonymous_id, v.ip_masked
   from public.analytics_sessions s
   join public.analytics_visitors v on v.id = s.visitor_id
   where s.started_at >= p_start
@@ -192,6 +192,7 @@ visitor_rows as (
     max(s.anonymous_id) as anonymous_id,
     coalesce(max(s.country_code), 'Unknown') as country,
     coalesce(max(s.source), 'Direct') as source,
+    coalesce(max(s.ip_masked), '') as ip_masked,
     count(*) as visits,
     max(s.last_seen_at) as last_seen,
     (array_agg(e.page_path order by e.created_at desc))[1] as latest_page
@@ -229,7 +230,7 @@ select jsonb_build_object(
   'visitors', coalesce((select jsonb_agg(jsonb_build_object(
     'anonymousId', anonymous_id, 'country', country, 'source', source, 'visits', visits,
     'lastSeen', to_char(last_seen at time zone 'UTC', 'YYYY-MM-DD HH24:MI'),
-    'latestPage', coalesce(latest_page, '/'), 'classification', case when visits >= 3 then 'Returning' else 'New' end
+    'latestPage', coalesce(latest_page, '/'), 'ipMasked', ip_masked, 'classification', case when visits >= 3 then 'Returning' else 'New' end
   ) order by last_seen desc) from (
     select * from ordered_visitors offset greatest((p_page - 1) * p_page_size, 0) limit least(greatest(p_page_size, 25), 100)
   ) x), '[]'::jsonb),
