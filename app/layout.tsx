@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { ScrollProgress } from "@/components/ScrollProgress";
 import { StickyContact } from "@/components/StickyContact";
 import "./globals.css";
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   };
   return (
     <html lang="en">
-      <body><ScrollProgress />{children}<StickyContact /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} /></body>
+      <body><AnalyticsTracker /><ScrollProgress />{children}<StickyContact /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} /></body>
     </html>
   );
 }
