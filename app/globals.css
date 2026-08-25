@@ -344,3 +344,82 @@ main { animation: page-enter .7s cubic-bezier(.22, 1, .36, 1) both; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .scroll-reveal { opacity: 1; transform: none; }
 }
+
+/* Responsive QA pass: keeps the editorial desktop layout while making touch-first
+   reading, imagery and conversion paths comfortable on smaller screens. */
+html, body { max-width: 100%; overflow-x: clip; }
+img { max-width: 100%; }
+:focus-visible { outline: 3px solid rgba(184, 94, 54, .72); outline-offset: 3px; }
+
+@media (max-width: 780px) {
+  .site-header { padding-right: max(22px, env(safe-area-inset-right)); padding-left: max(22px, env(safe-area-inset-left)); }
+  .nav { top: 76px; right: max(14px, env(safe-area-inset-right)); left: max(14px, env(safe-area-inset-left)); max-height: calc(100vh - 96px); overflow-y: auto; }
+  .nav a, .nav-mega-trigger button { min-height: 44px; }
+  .hero-copy, .page-hero-copy { padding-right: max(27px, env(safe-area-inset-right)); padding-left: max(27px, env(safe-area-inset-left)); }
+  h1, .page-hero-copy h1, .listing-hero h1, .quote-hero h1 { font-size: clamp(3.05rem, 14.4vw, 4.55rem); line-height: .97; letter-spacing: -.066em; overflow-wrap: anywhere; }
+  .lead { max-width: 35rem; font-size: 1rem; line-height: 1.62; }
+  .hero-image-wrap { min-height: clamp(330px, 96vw, 455px); border-bottom-left-radius: 43% 11%; }
+  .hero-image-wrap .cover-image { object-position: 54% center; }
+  .page-hero-copy { min-height: 0; padding-top: 68px; padding-bottom: 44px; }
+  .page-hero-image { min-height: clamp(300px, 80vw, 390px); }
+  .process-image .cover-image { object-position: 60% center; }
+  .quality-image .cover-image { object-position: 57% center; }
+  .proof-row { gap: 18px 15px; margin-top: 38px; }
+  .proof-row span { font-size: 11px; line-height: 1.38; }
+  .section-intro > p:not(.eyebrow), .process-copy > p, .markets-copy > p, .two-column > div:last-child, .market-story p:not(.eyebrow), .facility-feature p:not(.eyebrow) { font-size: 15px; line-height: 1.62; }
+  .showcase-card span { right: 18px; bottom: 18px; }
+  .sticky-contact { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); }
+  .sticky-contact a { min-height: 44px; padding: 11px 14px; }
+  .quote-form input, .quote-form select, .quote-form textarea, .brief-card input, .brief-card select { min-height: 48px; font-size: 16px; }
+  .quote-form textarea { min-height: 150px; }
+  .quote-form .button, .brief-card .button { min-height: 50px; justify-content: center; }
+  .footer a, .footer p { font-size: 12px; }
+}
+
+@media (max-width: 560px) {
+  .site-header { height: 72px; }
+  .logo-lockup { min-width: 0; gap: 8px; font-size: 17px; }
+  .logo-lockup img { width: 43px; height: 43px; }
+  .nav { top: 71px; }
+  .hero-copy { padding-top: 48px; padding-bottom: 34px; }
+  .eyebrow { margin-bottom: 15px; font-size: 9px; letter-spacing: .13em; }
+  .hero-copy .button, .page-hero-copy .button { min-height: 48px; }
+  .application-grid { grid-template-columns: 1fr; gap: 14px; }
+  .application-card { display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); }
+  .application-card > a { min-width: 0; }
+  .application-card .card-image { height: 100%; min-height: 218px; aspect-ratio: auto; }
+  .application-card-copy { display: flex; min-height: 0; flex-direction: column; justify-content: center; padding: 26px 20px; }
+  .application-card h3 { font-size: 25px; }
+  .application-card p { min-height: 0; margin-bottom: 14px; font-size: 12px; line-height: 1.56; }
+  .application-card a { font-size: 11px; }
+  .process-section { padding-right: max(18px, env(safe-area-inset-right)); padding-left: max(18px, env(safe-area-inset-left)); }
+  .process-image { min-height: 315px; border-top-right-radius: 72px; border-bottom-right-radius: 72px; }
+  .process-copy { margin-top: -22px; padding: 50px 24px 38px; border-radius: 0 66px 66px 0; }
+  .process-list { gap: 22px; }
+  .quality { padding-right: max(18px, env(safe-area-inset-right)); padding-left: max(18px, env(safe-area-inset-left)); }
+  .quality-copy { padding: 48px 24px 42px; border-top-left-radius: 66px; }
+  .quality-image { min-height: 255px; }
+  .company-showcase-grid { gap: 10px; }
+  .showcase-campus, .showcase-card, .facility-gallery .gallery-wide, .facility-gallery figure, .event-gallery figure, .event-gallery .event-feature { min-height: 255px; }
+  .showcase-campus { min-height: 340px; }
+  .markets.section { padding-right: 18px; padding-left: 18px; }
+  .brief-card { padding: 32px 22px; border-top-left-radius: 64px; }
+  .content-section, .market-story, .facility-feature, .quote-page, .listing-hero, .quote-hero, .focus-section, .timeline-section, .faq-list { padding-right: 22px; padding-left: 22px; }
+  .listing-grid, .resource-grid { padding-right: 18px; padding-left: 18px; }
+  .listing-card > div { padding: 24px 21px; }
+  .listing-card h2 { font-size: clamp(31px, 10vw, 42px); }
+  .contact-details article, .capability-grid article, .resource-grid article, .contact-grid article, .quote-form { padding: 25px 21px; }
+  .quote-page { gap: 26px; }
+  .footer { grid-template-columns: 1fr; gap: 26px; padding: 42px 22px 88px; }
+  .footer-brand { grid-column: auto; }
+  .footer-brand p, .footer-note { max-width: 33rem; }
+}
+
+@media (max-width: 360px) {
+  .logo-lockup span { font-size: 15px; }
+  .proof-row { grid-template-columns: 1fr; gap: 14px; }
+  .application-card { grid-template-columns: 1fr; }
+  .application-card .card-image { min-height: 205px; aspect-ratio: 1.45 / 1; }
+  .sticky-contact { right: 10px; left: 10px; max-width: none; justify-content: stretch; }
+  .sticky-contact a { flex: 1; justify-content: center; }
+}
