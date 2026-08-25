@@ -423,3 +423,11 @@ img { max-width: 100%; }
   .sticky-contact { right: 10px; left: 10px; max-width: none; justify-content: stretch; }
   .sticky-contact a { flex: 1; justify-content: center; }
 }
+
+
+/* On common 375–430px screens, a single-column card prevents product copy
+   and imagery from competing for the same narrow horizontal space. */
+@media (max-width: 460px) {
+  .application-card { grid-template-columns: 1fr; }
+  .application-card .card-image { min-height: 205px; aspect-ratio: 1.45 / 1; }
+}
