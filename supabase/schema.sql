@@ -105,20 +105,31 @@ alter table public.analytics_sessions enable row level security;
 alter table public.analytics_events enable row level security;
 alter table public.traffic_rules enable row level security;
 alter table public.leads enable row level security;
+alter table private.request_limits enable row level security;
 
 -- There are deliberately no anon/authenticated policies. Only the server-side service key
 -- may write/read operational data. Do not put this key in client-side variables.
-revoke all on all tables in schema public from anon, authenticated;
-revoke all on all sequences in schema public from anon, authenticated;
+revoke all on table
+  public.analytics_visitors,
+  public.analytics_sessions,
+  public.analytics_events,
+  public.traffic_rules,
+  public.leads
+from anon, authenticated;
+revoke all on sequence public.analytics_events_id_seq from anon, authenticated;
 revoke all on schema private from public, anon, authenticated;
+revoke all on table private.request_limits from public, anon, authenticated;
 grant usage on schema public to service_role;
-grant select, insert, update, delete on all tables in schema public to service_role;
-grant usage, select on all sequences in schema public to service_role;
+grant select, insert, update, delete on table
+  public.analytics_visitors,
+  public.analytics_sessions,
+  public.analytics_events,
+  public.traffic_rules,
+  public.leads
+to service_role;
+grant usage, select on sequence public.analytics_events_id_seq to service_role;
 grant usage on schema private to service_role;
-grant select, insert, update, delete on all tables in schema private to service_role;
-
-alter default privileges in schema public revoke all on tables from anon, authenticated;
-alter default privileges in schema public revoke all on sequences from anon, authenticated;
+grant select, insert, update, delete on table private.request_limits to service_role;
 
 create or replace function public.check_request_limit(
   p_scope text,
