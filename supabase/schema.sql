@@ -97,6 +97,7 @@ create index if not exists analytics_sessions_started_at_idx on public.analytics
 create index if not exists analytics_sessions_visitor_idx on public.analytics_sessions (visitor_id, started_at desc);
 create index if not exists analytics_events_created_at_idx on public.analytics_events (created_at desc);
 create index if not exists analytics_events_session_idx on public.analytics_events (session_id, created_at desc);
+create index if not exists analytics_events_visitor_idx on public.analytics_events (visitor_id, created_at desc);
 create index if not exists leads_created_at_idx on public.leads (created_at desc);
 create index if not exists leads_status_idx on public.leads (status);
 
