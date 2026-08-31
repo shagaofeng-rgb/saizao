@@ -5,3 +5,6 @@ dist/
 .env
 .env.*
 !.env.example
+output/
+.impeccable/
+.learnings/
