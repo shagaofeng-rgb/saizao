@@ -54,6 +54,7 @@ export function AdminDashboard() {
         <a href="#visitors">访客与旅程</a>
         <a href="#leads">询盘 CRM</a>
         <a href="#quality">流量质量</a>
+        <a href="/admin/change-password">账号与密码</a>
         <span>产品与内容 <small>下一期</small></span>
         <span>市场与投流 <small>下一期</small></span>
       </nav>

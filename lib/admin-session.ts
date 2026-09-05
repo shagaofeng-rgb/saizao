@@ -1,5 +1,7 @@
+import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { rpc } from "@/lib/supabase-server";
 
 const cookieName = "sz_admin_session";
 const maxAgeSeconds = 60 * 60 * 8;
@@ -14,32 +16,46 @@ function signature(value: string) {
   return createHmac("sha256", secret()).update(value).digest("hex");
 }
 
-export function createAdminSessionValue() {
-  const issuedAt = Math.floor(Date.now() / 1000).toString();
-  const payload = `admin.${issuedAt}`;
+type AdminSession = { accountId: string; username: string; version: number; issuedAt: number };
+
+export function createAdminSessionValue(accountId: string, username: string, version: number) {
+  const payload = Buffer.from(JSON.stringify({ accountId, username, version, issuedAt: Math.floor(Date.now() / 1000) }), "utf8").toString("base64url");
   return `${payload}.${signature(payload)}`;
 }
 
-export function isValidAdminSession(value?: string) {
-  if (!value) return false;
-  const [role, issuedAt, suppliedSignature] = value.split(".");
-  if (role !== "admin" || !issuedAt || !suppliedSignature) return false;
-  const issuedAtNumber = Number(issuedAt);
+export function parseAdminSession(value?: string): AdminSession | null {
+  if (!value) return null;
+  const [payload, suppliedSignature, extra] = value.split(".");
+  if (!payload || !suppliedSignature || extra) return null;
+  const expected = signature(payload);
+  if (expected.length !== suppliedSignature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(suppliedSignature))) return null;
+  let parsed: Partial<AdminSession>;
+  try {
+    parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Partial<AdminSession>;
+  } catch {
+    return null;
+  }
+  const issuedAtNumber = Number(parsed.issuedAt);
   const now = Date.now() / 1000;
-  if (!Number.isFinite(issuedAtNumber) || issuedAtNumber > now + 60 || now - issuedAtNumber > maxAgeSeconds) return false;
-  const expected = signature(`${role}.${issuedAt}`);
-  if (expected.length !== suppliedSignature.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(suppliedSignature));
+  if (!Number.isFinite(issuedAtNumber) || issuedAtNumber > now + 60 || now - issuedAtNumber > maxAgeSeconds) return null;
+  if (typeof parsed.accountId !== "string" || typeof parsed.username !== "string" || !Number.isInteger(parsed.version)) return null;
+  return { accountId: parsed.accountId, username: parsed.username, version: Number(parsed.version), issuedAt: issuedAtNumber };
 }
 
-export async function hasAdminSession() {
+export async function getAdminSession() {
   const store = await cookies();
   try {
-    return isValidAdminSession(store.get(cookieName)?.value);
+    const session = parseAdminSession(store.get(cookieName)?.value);
+    if (!session) return null;
+    const account = await rpc<{ is_active: boolean; session_version: number }[]>("admin_get_session_account", { p_account_id: session.accountId });
+    if (!account[0]?.is_active || account[0].session_version !== session.version) return null;
+    return session;
   } catch {
-    return false;
+    return null;
   }
 }
+
+export async function hasAdminSession() { return Boolean(await getAdminSession()); }
 
 export const adminCookie = {
   name: cookieName,
