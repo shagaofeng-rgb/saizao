@@ -277,6 +277,113 @@ $$;
 revoke all on function public.track_analytics_event(jsonb) from public, anon, authenticated;
 grant execute on function public.track_analytics_event(jsonb) to service_role;
 
+-- Private administrator credentials and one-time password recovery tokens.
+create table if not exists private.admin_accounts (
+  id uuid primary key default gen_random_uuid(),
+  username text not null unique check (username = lower(username) and username ~ '^[a-z0-9][a-z0-9._-]{2,63}$'),
+  email text not null unique check (email = lower(email) and length(email) <= 254),
+  password_hash text not null check (length(password_hash) between 80 and 120),
+  password_salt text not null check (length(password_salt) between 20 and 64),
+  is_active boolean not null default true,
+  session_version integer not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  password_changed_at timestamptz not null default now()
+);
+
+create table if not exists private.admin_password_resets (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references private.admin_accounts(id) on delete cascade,
+  token_hash text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists admin_password_resets_account_idx on private.admin_password_resets (account_id, created_at desc);
+create index if not exists admin_password_resets_expiry_idx on private.admin_password_resets (expires_at) where used_at is null;
+alter table private.admin_accounts enable row level security;
+alter table private.admin_password_resets enable row level security;
+revoke all on table private.admin_accounts, private.admin_password_resets from public, anon, authenticated;
+grant select, insert, update, delete on table private.admin_accounts, private.admin_password_resets to service_role;
+
+create or replace function public.admin_get_account(p_login text)
+returns table (account_id uuid, username text, email text, password_hash text, password_salt text, is_active boolean, session_version integer)
+language sql stable security definer set search_path = ''
+as $$
+  select a.id, a.username, a.email, a.password_hash, a.password_salt, a.is_active, a.session_version
+  from private.admin_accounts a
+  where a.username = lower(trim(p_login)) or a.email = lower(trim(p_login))
+  limit 1;
+$$;
+
+create or replace function public.admin_get_session_account(p_account_id uuid)
+returns table (is_active boolean, session_version integer)
+language sql stable security definer set search_path = ''
+as $$
+  select a.is_active, a.session_version from private.admin_accounts a where a.id = p_account_id limit 1;
+$$;
+
+create or replace function public.admin_create_password_reset(p_login text, p_token_hash text, p_expires_at timestamptz)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare v_account private.admin_accounts%rowtype;
+begin
+  if p_token_hash !~ '^[0-9a-f]{64}$' or p_expires_at <= now() or p_expires_at > now() + interval '1 hour' then return null; end if;
+  select * into v_account from private.admin_accounts a
+  where a.is_active and (a.username = lower(trim(p_login)) or a.email = lower(trim(p_login))) limit 1;
+  if not found then return null; end if;
+  update private.admin_password_resets set used_at = now() where account_id = v_account.id and used_at is null;
+  insert into private.admin_password_resets (account_id, token_hash, expires_at) values (v_account.id, p_token_hash, p_expires_at);
+  delete from private.admin_password_resets where created_at < now() - interval '2 days';
+  return jsonb_build_object('account_id', v_account.id, 'username', v_account.username, 'email', v_account.email);
+end;
+$$;
+
+create or replace function public.admin_consume_password_reset(p_token_hash text, p_password_hash text, p_password_salt text)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare v_reset private.admin_password_resets%rowtype; v_username text; v_version integer;
+begin
+  if p_token_hash !~ '^[0-9a-f]{64}$' or length(p_password_hash) not between 80 and 120 or length(p_password_salt) not between 20 and 64 then return jsonb_build_object('updated', false); end if;
+  select * into v_reset from private.admin_password_resets r
+  where r.token_hash = p_token_hash and r.used_at is null and r.expires_at > now() for update;
+  if not found then return jsonb_build_object('updated', false); end if;
+  update private.admin_accounts
+  set password_hash = p_password_hash, password_salt = p_password_salt, password_changed_at = now(), updated_at = now(), session_version = session_version + 1
+  where id = v_reset.account_id and is_active returning username, session_version into v_username, v_version;
+  if not found then return jsonb_build_object('updated', false); end if;
+  update private.admin_password_resets set used_at = now() where account_id = v_reset.account_id and used_at is null;
+  return jsonb_build_object('updated', true, 'username', v_username, 'session_version', v_version);
+end;
+$$;
+
+create or replace function public.admin_update_password(p_account_id uuid, p_password_hash text, p_password_salt text)
+returns jsonb language plpgsql security definer set search_path = ''
+as $$
+declare v_version integer;
+begin
+  if length(p_password_hash) not between 80 and 120 or length(p_password_salt) not between 20 and 64 then return jsonb_build_object('updated', false); end if;
+  update private.admin_accounts
+  set password_hash = p_password_hash, password_salt = p_password_salt, password_changed_at = now(), updated_at = now(), session_version = session_version + 1
+  where id = p_account_id and is_active returning session_version into v_version;
+  if not found then return jsonb_build_object('updated', false); end if;
+  update private.admin_password_resets set used_at = now() where account_id = p_account_id and used_at is null;
+  return jsonb_build_object('updated', true, 'session_version', v_version);
+end;
+$$;
+
+revoke all on function public.admin_get_account(text) from public, anon, authenticated;
+revoke all on function public.admin_get_session_account(uuid) from public, anon, authenticated;
+revoke all on function public.admin_create_password_reset(text, text, timestamptz) from public, anon, authenticated;
+revoke all on function public.admin_consume_password_reset(text, text, text) from public, anon, authenticated;
+revoke all on function public.admin_update_password(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.admin_get_account(text) to service_role;
+grant execute on function public.admin_get_session_account(uuid) to service_role;
+grant execute on function public.admin_create_password_reset(text, text, timestamptz) to service_role;
+grant execute on function public.admin_consume_password_reset(text, text, text) to service_role;
+grant execute on function public.admin_update_password(uuid, text, text) to service_role;
+
 create or replace function public.admin_dashboard(
   p_start timestamptz,
   p_end timestamptz,

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { adminCookie, createAdminSessionValue } from "@/lib/admin-session";
-import { fingerprint, isSameOrigin, requestBodyTooLarge, safeEqualText } from "@/lib/request-security";
+import { AdminAccount, normalizeAdminLogin, verifyAdminPassword } from "@/lib/admin-credentials";
+import { fingerprint, isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 import { isSupabaseConfigured, rpc } from "@/lib/supabase-server";
 
+const dummyPasswordHash = "A".repeat(86);
+const dummyPasswordSalt = "admin-login-dummy-salt";
+
 export async function POST(request: Request) {
-  const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD;
-  if (!configuredPassword || configuredPassword.length < 14 || !process.env.ADMIN_SESSION_SECRET || !isSupabaseConfigured()) {
-    return NextResponse.json({ message: "后台尚未完成安全配置，请先在 Vercel 设置管理员环境变量。" }, { status: 503 });
+  if (!process.env.ADMIN_SESSION_SECRET || !isSupabaseConfigured()) {
+    return NextResponse.json({ message: "后台尚未完成安全配置。" }, { status: 503 });
   }
 
   if (!isSameOrigin(request)) return NextResponse.json({ message: "请求校验失败。" }, { status: 403 });
@@ -20,11 +23,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "安全校验服务暂不可用。" }, { status: 503 });
   }
 
-  if (typeof body.password !== "string" || !safeEqualText(body.password, configuredPassword)) {
-    return NextResponse.json({ message: "密码不正确。" }, { status: 401 });
+  const login = normalizeAdminLogin(body.username);
+  const password = typeof body.password === "string" ? body.password : "";
+  let account: AdminAccount | undefined;
+  try {
+    account = (await rpc<AdminAccount[]>("admin_get_account", { p_login: login }))[0];
+  } catch {
+    return NextResponse.json({ message: "账号服务暂不可用。" }, { status: 503 });
+  }
+  const passwordMatches = verifyAdminPassword(password, account?.password_hash ?? dummyPasswordHash, account?.password_salt ?? dummyPasswordSalt);
+  if (!account?.is_active || !passwordMatches) {
+    return NextResponse.json({ message: "账号或密码不正确。" }, { status: 401 });
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set({ ...adminCookie, value: createAdminSessionValue() });
+  response.cookies.set({ ...adminCookie, value: createAdminSessionValue(account.account_id, account.username, account.session_version) });
   return response;
 }
