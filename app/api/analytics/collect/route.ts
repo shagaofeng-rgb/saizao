@@ -10,7 +10,7 @@ function maskIp(value: string) {
   return value.replace(/:[^:]+$/, ":*");
 }
 
-function ipHash(value: string) {
+function inferSource(value: string, explicit: string) {\n  if (explicit) return explicit;\n  try {\n    const host = new URL(value).hostname.toLowerCase();\n    if (/google\./.test(host)) return "google-organic";\n    if (/bing\./.test(host)) return "bing-organic";\n    if (/facebook|instagram/.test(host)) return "meta-organic";\n    if (/linkedin/.test(host)) return "linkedin-organic";\n    if (host) return host;\n  } catch {}\n  return null;\n}\n\nfunction ipHash(value: string) {
   const salt = process.env.ANALYTICS_IP_SALT;
   if (!salt || salt.length < 32) throw new Error("ANALYTICS_IP_SALT must be at least 32 characters.");
   return createHmac("sha256", salt).update(value).digest("hex");
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         page_path: path,
         page_title: cleanText(body.title, 180),
         referrer: cleanText(body.referrer, 2048) || null,
-        source: cleanText(body.utmSource, 160) || null,
+        source: inferSource(cleanText(body.referrer, 2048), cleanText(body.utmSource, 160)),
         medium: cleanText(body.utmMedium, 160) || null,
         campaign: cleanText(body.utmCampaign, 220) || null,
         term: cleanText(body.utmTerm, 220) || null,
