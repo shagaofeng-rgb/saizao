@@ -20,7 +20,8 @@ export async function GET(request:Request,{params}:{params:Promise<{kind:string}
   const search=new URL(request.url).searchParams, page=Math.max(1,Number(search.get("page")??1)), pageSize=Math.min(100,Math.max(10,Number(search.get("pageSize")??25)));
   const term=search.get("q")?.trim(), status=search.get("status")?.trim();
   const filters=[status&&["draft","review","published","archived"].includes(status)?`status=eq.${status}`:null,term?`title=ilike.*${encodeURIComponent(term.replace(/[,*()]/g,""))}*`:null].filter(Boolean).join("&");
-  const response=await rest<Record<string,unknown>[]>(`${table}?select=id,title,slug,status,updated_at,published_at,cover_url,summary,excerpt,article_type,content_categories(name)&order=updated_at.desc&limit=${pageSize}&offset=${(page-1)*pageSize}${filters?`&${filters}`:""}`,{headers:{Prefer:"count=exact"}}).catch(()=>null);
+  const fields=table==="products"?"id,title,slug,status,updated_at,published_at,cover_url,summary,application,content_categories(name)":"id,title,slug,status,updated_at,published_at,cover_url,excerpt,article_type,content_categories(name)";
+  const response=await rest<Record<string,unknown>[]>(`${table}?select=${fields}&order=updated_at.desc&limit=${pageSize}&offset=${(page-1)*pageSize}${filters?`&${filters}`:""}`,{headers:{Prefer:"count=exact"}}).catch(()=>null);
   if(!response) return NextResponse.json({message:"无法读取内容。"},{status:503});
   const range=response.response.headers.get("content-range")??"0-0/0", total=Number(range.split("/")[1]??0);
   return NextResponse.json({data:response.data,total,page,pageSize});
