@@ -15,7 +15,7 @@ function date(value: Date) { return value.toISOString().slice(0, 10); }
 export function AdminDashboard() {
   const router = useRouter();
   const today = date(new Date());
-  const [from, setFrom] = useState(() => date(new Date(Date.now() - 6 * 86400000)));
+  const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [country, setCountry] = useState("");
   const [source, setSource] = useState("");
@@ -51,12 +51,13 @@ export function AdminDashboard() {
       <a className="admin-brand" href="#overview"><span>SAI ZHAO</span><small>B2B GROWTH CONSOLE</small></a>
       <nav aria-label="后台导航">
         <a className="active" href="#overview">数据总览</a>
-        <a href="#visitors">访客与旅程</a>
+        <a href="#visitors">流量与访客</a>
         <a href="#leads">询盘 CRM</a>
+        <a href="/admin/products">产品管理</a>
+        <a href="/admin/news">新闻与 SEO</a>
+        <a href="/admin/staff">员工与权限</a>
         <a href="#quality">流量质量</a>
         <a href="/admin/change-password">账号与密码</a>
-        <span>产品与内容 <small>下一期</small></span>
-        <span>市场与投流 <small>下一期</small></span>
       </nav>
       <div className="admin-sidebar-note"><b>实时数据</b><p>仅统计已通过质量规则的访问。</p></div>
     </aside>
