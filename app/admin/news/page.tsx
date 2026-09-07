@@ -1,0 +1,1 @@
+import { redirect } from "next/navigation"; import { hasAdminSession } from "@/lib/admin-session"; import { ContentManager } from "@/components/admin/ContentManager"; export const dynamic="force-dynamic"; export default async function AdminNews(){if(!(await hasAdminSession()))redirect("/admin/login");return <ContentManager kind="articles"/>;}

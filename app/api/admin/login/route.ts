@@ -36,7 +36,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "账号或密码不正确。" }, { status: 401 });
   }
 
-  const response = NextResponse.json({ ok: true });
+  await rpc("admin_record_login", { p_account_id: account.account_id }).catch(() => null);
+  const response = NextResponse.json({ ok: true, mustChangePassword: Boolean(account.force_password_reset) });
   response.cookies.set({ ...adminCookie, value: createAdminSessionValue(account.account_id, account.username, account.session_version) });
   return response;
 }
