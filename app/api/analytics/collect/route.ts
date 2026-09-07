@@ -10,7 +10,20 @@ function maskIp(value: string) {
   return value.replace(/:[^:]+$/, ":*");
 }
 
-function inferSource(value: string, explicit: string) {\n  if (explicit) return explicit;\n  try {\n    const host = new URL(value).hostname.toLowerCase();\n    if (/google\./.test(host)) return "google-organic";\n    if (/bing\./.test(host)) return "bing-organic";\n    if (/facebook|instagram/.test(host)) return "meta-organic";\n    if (/linkedin/.test(host)) return "linkedin-organic";\n    if (host) return host;\n  } catch {}\n  return null;\n}\n\nfunction ipHash(value: string) {
+function inferSource(value: string, explicit: string) {
+  if (explicit) return explicit;
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    if (/google\./.test(host)) return "google-organic";
+    if (/bing\./.test(host)) return "bing-organic";
+    if (/facebook|instagram/.test(host)) return "meta-organic";
+    if (/linkedin/.test(host)) return "linkedin-organic";
+    if (host) return host;
+  } catch {}
+  return null;
+}
+
+function ipHash(value: string) {
   const salt = process.env.ANALYTICS_IP_SALT;
   if (!salt || salt.length < 32) throw new Error("ANALYTICS_IP_SALT must be at least 32 characters.");
   return createHmac("sha256", salt).update(value).digest("hex");
