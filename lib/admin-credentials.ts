@@ -10,7 +10,7 @@ export type AdminAccount = {
   password_hash: string;
   password_salt: string;
   is_active: boolean;
-  session_version: number;
+  session_version: number;\n  role?: "super_admin" | "admin" | "sales" | "content_editor" | "viewer";\n  force_password_reset?: boolean;
 };
 
 export function normalizeAdminLogin(value: unknown) {
