@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 export function AdminChangePassword() {
   const router = useRouter();
@@ -25,5 +26,5 @@ export function AdminChangePassword() {
     setSending(false);
   }
 
-  return <main id="main-content" className="admin-login"><form onSubmit={submit}><p className="admin-kicker">ACCOUNT SECURITY</p><h1>修改后台密码</h1><p>修改后其他设备上的后台登录会立即失效。</p><label>当前密码<input autoFocus type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label><label>新密码<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={16} /></label><label>确认新密码<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={16} /></label><button type="submit" disabled={sending}>{sending ? "正在更新…" : "保存新密码"}</button><div aria-live="polite">{message && <p className={message.includes("已更新") ? "admin-success" : "admin-error"}>{message}</p>}</div><Link className="admin-auth-link" href="/admin">返回数据后台</Link></form></main>;
+  return <AdminShell><section id="main-content" className="admin-content admin-content-narrow"><header className="admin-header"><div><h1>账号安全</h1><p className="admin-subtitle">修改密码后，其他设备上的登录状态将失效。</p></div></header><form className="admin-editor admin-editor-narrow" onSubmit={submit}><h2>修改密码</h2><label>当前密码<input autoFocus type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></label><label>新密码<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={16} /><small>至少 16 位，包含大小写字母、数字和符号。</small></label><label>确认新密码<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={16} /></label><button className="admin-primary" type="submit" disabled={sending}>{sending ? "正在保存…" : "保存新密码"}</button><div aria-live="polite">{message && <p className={message.includes("已更新") ? "admin-success" : "admin-error"}>{message}</p>}</div><Link className="admin-text-link" href="/admin">返回运营概览</Link></form></section></AdminShell>;
 }
