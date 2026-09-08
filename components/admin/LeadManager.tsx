@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AdminRangeFilter, RangePreset, formatChina, toRangeQuery } from "./AdminRangeFilter";
+import { AdminRangeFilter, RangePreset, formatChina, presetBounds, toRangeQuery } from "./AdminRangeFilter";
 
 type Lead={id:string;created_at:string;status:string;name:string;email:string;company:string;application?:string;country_code?:string;country_name?:string;phone?:string;page_path?:string;source?:string;medium?:string;campaign?:string;anonymous_id?:string;next_follow_up_at?:string};
 const stages=["New","Contacted","Qualified","Sample","Quote","Negotiation","Won","Lost"];
