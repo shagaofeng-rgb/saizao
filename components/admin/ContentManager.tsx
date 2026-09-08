@@ -1,27 +1,112 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
-import { AdminRangeFilter, RangePreset, presetBounds, toRangeQuery } from "./AdminRangeFilter";
 
-type Item={id:string;title:string;slug:string;status:string;updated_at:string;cover_url?:string;summary?:string;excerpt?:string;article_type?:string;content_categories?:{name:string}|null};
-const statuses=["draft","review","published","archived"];
-export function ContentManager({kind}:{kind:"products"|"articles"}) {
-  const label=kind==="products"?"产品":"新闻与内容";
-  const [items,setItems]=useState<Item[]>([]),[total,setTotal]=useState(0),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(20),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
-  const initial=presetBounds("month");const [preset,setPreset]=useState<RangePreset>("month"),[from,setFrom]=useState(initial.from),[to,setTo]=useState(initial.to),[query,setQuery]=useState(""),[statusFilter,setStatusFilter]=useState("");
-  const [form,setForm]=useState({title:"",slug:"",categoryName:"",summary:"",application:"",articleType:"news",content:"",seoTitle:"",seoDescription:"",status:"draft",coverUrl:"",attachmentUrl:""});
-  function changePreset(value:RangePreset){setPreset(value);if(value!=="custom"){const next=presetBounds(value);setFrom(next.from);setTo(next.to);}setPage(1);}
-  async function load(){const params=new URLSearchParams({page:String(page),pageSize:String(pageSize)});const dates=toRangeQuery(from,to);params.set("from",dates.from);params.set("to",dates.to);if(query.trim())params.set("q",query.trim());if(statusFilter)params.set("status",statusFilter);const r=await fetch("/api/admin/content/"+kind+"?"+params.toString(),{cache:"no-store"});const j=await r.json();if(r.ok){setItems(j.data);setTotal(j.total);}else setMessage(j.message??"读取失败。");}
-  useEffect(()=>{void load();},[page,pageSize,preset,from,to,query,statusFilter]);
-  async function upload(file:File, field:"coverUrl"|"attachmentUrl"){setBusy(true);const fd=new FormData();fd.set("file",file);const r=await fetch("/api/admin/media",{method:"POST",body:fd});const j=await r.json();if(r.ok)setForm(v=>({...v,[field]:j.data.public_url}));else setMessage(j.message??"上传失败。");setBusy(false);}
-  async function submit(event:FormEvent){event.preventDefault();setBusy(true);setMessage("");const r=await fetch(`/api/admin/content/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const j=await r.json();setBusy(false);if(!r.ok){setMessage(j.message??"保存失败。");return;}setMessage(`${label}已保存。`);setForm({title:"",slug:"",categoryName:"",summary:"",application:"",articleType:"news",content:"",seoTitle:"",seoDescription:"",status:"draft",coverUrl:"",attachmentUrl:""});setPage(1);void load();}
-  async function changeStatus(id:string,status:string){const r=await fetch(`/api/admin/content/${kind}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status})});const j=await r.json();setMessage(r.ok?"状态已更新。":(j.message??"更新失败。"));if(r.ok)void load();}
-  const pages=Math.max(1,Math.ceil(total/pageSize));
-  return <main className="admin-content admin-content-wide"><header className="admin-header"><div><p className="admin-kicker">CONTENT OPERATIONS</p><h1>{label}管理</h1><p className="admin-subtitle">发布后的内容会自动出现在官网公开列表与详情页。</p></div><a className="admin-logout" href="/admin">返回数据总览</a></header>
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { AdminShell } from "@/components/admin/AdminShell";
+
+type Item = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  updated_at: string;
+  article_type?: string;
+  content_categories?: { name: string } | null;
+};
+
+const statuses = ["draft", "review", "published", "archived"];
+const statusLabels: Record<string, string> = { draft: "草稿", review: "待审核", published: "已发布", archived: "已归档" };
+const articleTypeLabels: Record<string, string> = { news: "新闻", insight: "洞察", faq: "常见问题", market: "市场动态" };
+
+export function ContentManager({ kind }: { kind: "products" | "articles" }) {
+  const label = kind === "products" ? "产品" : "资讯";
+  const [items, setItems] = useState<Item[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ title: "", slug: "", categoryName: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", status: "draft", coverUrl: "", attachmentUrl: "" });
+
+  const load = useCallback(async () => {
+    const response = await fetch(`/api/admin/content/${kind}?page=${page}&pageSize=${pageSize}`, { cache: "no-store" });
+    const result = await response.json();
+    if (response.ok) {
+      setItems(result.data);
+      setTotal(result.total);
+    } else {
+      setMessage(result.message ?? "读取失败。");
+    }
+  }, [kind, page, pageSize]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timeout);
+  }, [load]);
+
+  async function upload(file: File, field: "coverUrl" | "attachmentUrl") {
+    setBusy(true);
+    const formData = new FormData();
+    formData.set("file", file);
+    const response = await fetch("/api/admin/media", { method: "POST", body: formData });
+    const result = await response.json();
+    if (response.ok) setForm((value) => ({ ...value, [field]: result.data.public_url }));
+    else setMessage(result.message ?? "上传失败。");
+    setBusy(false);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    const response = await fetch(`/api/admin/content/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const result = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setMessage(result.message ?? "保存失败。");
+      return;
+    }
+    setMessage("已保存。");
+    setForm({ title: "", slug: "", categoryName: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", status: "draft", coverUrl: "", attachmentUrl: "" });
+    setPage(1);
+    void load();
+  }
+
+  async function changeStatus(id: string, status: string) {
+    const response = await fetch(`/api/admin/content/${kind}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+    const result = await response.json();
+    setMessage(response.ok ? "状态已更新。" : (result.message ?? "更新失败。"));
+    if (response.ok) void load();
+  }
+
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+
+  return <AdminShell><section id="main-content" className="admin-content admin-content-wide">
+    <header className="admin-header"><div><h1>{label}管理</h1><p className="admin-subtitle">维护官网公开内容</p></div></header>
     <section className="admin-split">
-      <form className="admin-editor" onSubmit={submit}><h2>新建{label}</h2><div className="admin-form-grid"><label>标题<input required value={form.title} onChange={e=>setForm(v=>({...v,title:e.target.value}))}/></label><label>链接标识 Slug<input placeholder="custom-fragrance-oil" value={form.slug} onChange={e=>setForm(v=>({...v,slug:e.target.value}))}/></label><label>分类<input placeholder="Fine Fragrance" value={form.categoryName} onChange={e=>setForm(v=>({...v,categoryName:e.target.value}))}/></label>{kind==="products"?<label>应用场景<input placeholder="Perfume / Candle" value={form.application} onChange={e=>setForm(v=>({...v,application:e.target.value}))}/></label>:<label>内容类型<select value={form.articleType} onChange={e=>setForm(v=>({...v,articleType:e.target.value}))}><option value="news">News</option><option value="insight">Insight</option><option value="faq">FAQ</option><option value="market">Market</option></select></label>}<label>发布状态<select value={form.status} onChange={e=>setForm(v=>({...v,status:e.target.value}))}>{statuses.map(x=><option key={x} value={x}>{x}</option>)}</select></label></div>
-      <label>简介<textarea rows={3} value={form.summary} onChange={e=>setForm(v=>({...v,summary:e.target.value}))}/></label><label>正文内容<textarea rows={10} required value={form.content} onChange={e=>setForm(v=>({...v,content:e.target.value}))}/></label>
-      <div className="admin-form-grid"><label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e=>e.target.files?.[0]&&void upload(e.target.files[0],"coverUrl")}/>{form.coverUrl&&<small>图片已上传</small>}</label><label>PDF / 表格附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>e.target.files?.[0]&&void upload(e.target.files[0],"attachmentUrl")}/>{form.attachmentUrl&&<small>附件已上传</small>}</label></div>
-      <details><summary>SEO 设置</summary><label>SEO 标题<input value={form.seoTitle} onChange={e=>setForm(v=>({...v,seoTitle:e.target.value}))}/></label><label>SEO 描述<textarea rows={2} value={form.seoDescription} onChange={e=>setForm(v=>({...v,seoDescription:e.target.value}))}/></label></details><button className="admin-primary" disabled={busy}>{busy?"正在处理…":`保存${label}`}</button>{message&&<p className="admin-feedback">{message}</p>}</form>
-      <section className="admin-panel admin-list-panel"><AdminRangeFilter preset={preset} from={from} to={to} onPreset={changePreset} onFrom={value=>{setFrom(value);setPreset("custom");setPage(1)}} onTo={value=>{setTo(value);setPreset("custom");setPage(1)}} onApply={()=>{setPage(1);void load();}}/><div className="admin-query-row"><label>搜索标题<input value={query} placeholder="按标题搜索" onChange={e=>{setQuery(e.target.value);setPage(1)}}/></label><label>状态<select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setPage(1)}}><option value="">全部状态</option>{statuses.map(x=><option key={x} value={x}>{x}</option>)}</select></label></div><div className="admin-panel-heading"><div><p className="admin-kicker">PUBLISHED PIPELINE</p><h2>内容列表</h2></div><label>每页<select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1)}}><option value={20}>20 条</option><option value={50}>50 条</option><option value={100}>100 条</option></select></label></div><div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>{items.length?items.map(item=><tr key={item.id}><td><b>{item.title}</b><small>/{kind==="products"?"products":"news"}/{item.slug}</small></td><td>{item.content_categories?.name??"—"}</td><td><span className="admin-tag">{item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString()}</td><td><select value={item.status} onChange={e=>void changeStatus(item.id,e.target.value)}>{statuses.map(x=><option key={x}>{x}</option>)}</select></td></tr>):<tr><td colSpan={5} className="admin-empty">还没有内容记录。</td></tr>}</tbody></table></div><div className="admin-pagination"><span>共 {total} 条 · 第 {page}/{pages} 页</span><div><button disabled={page===1} onClick={()=>setPage(v=>v-1)}>上一页</button><button disabled={page===pages} onClick={()=>setPage(v=>v+1)}>下一页</button></div></div></section>
-    </section></main>;
+      <form className="admin-editor" onSubmit={submit}>
+        <h2>新建{label}</h2>
+        <div className="admin-form-grid">
+          <label>标题<input required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} /></label>
+          <label>页面地址 <span className="admin-field-code">Slug</span><input value={form.slug} onChange={(event) => setForm((value) => ({ ...value, slug: event.target.value }))} /></label>
+          <label>分类<input value={form.categoryName} onChange={(event) => setForm((value) => ({ ...value, categoryName: event.target.value }))} /></label>
+          {kind === "products" ? <label>应用场景<input value={form.application} onChange={(event) => setForm((value) => ({ ...value, application: event.target.value }))} /></label> : <label>内容类型<select value={form.articleType} onChange={(event) => setForm((value) => ({ ...value, articleType: event.target.value }))}>{Object.entries(articleTypeLabels).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>}
+          <label>发布状态<select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></label>
+        </div>
+        <label>简介<textarea rows={3} value={form.summary} onChange={(event) => setForm((value) => ({ ...value, summary: event.target.value }))} /></label>
+        <label>正文<textarea rows={10} required value={form.content} onChange={(event) => setForm((value) => ({ ...value, content: event.target.value }))} /></label>
+        <div className="admin-form-grid">
+          <label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "coverUrl")} />{form.coverUrl && <small>已上传</small>}</label>
+          <label>附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "attachmentUrl")} />{form.attachmentUrl && <small>已上传</small>}</label>
+        </div>
+        <details><summary>SEO 设置</summary><label>SEO 标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>SEO 描述<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
+        <button className="admin-primary" disabled={busy}>{busy ? "正在保存…" : `保存${label}`}</button>
+        <div aria-live="polite">{message && <p className="admin-feedback">{message}</p>}</div>
+      </form>
+      <section className="admin-panel admin-list-panel">
+        <div className="admin-panel-heading"><h2>{label}列表</h2><label>每页<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10 条</option><option value={25}>25 条</option><option value={50}>50 条</option></select></label></div>
+        <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>{items.length ? items.map((item) => <tr key={item.id}><td><b>{item.title}</b><small>/{kind === "products" ? "products" : "news"}/{item.slug}</small></td><td>{item.content_categories?.name ?? "—"}</td><td><span className="admin-tag">{statusLabels[item.status] ?? item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString("zh-CN")}</td><td><select value={item.status} aria-label={`${item.title}的发布状态`} onChange={(event) => void changeStatus(item.id, event.target.value)}>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></td></tr>) : <tr><td colSpan={5} className="admin-empty">暂无{label}</td></tr>}</tbody></table></div>
+        <div className="admin-pagination"><span>共 {total} 条 · 第 {page}/{pages} 页</span><div><button disabled={page === 1} onClick={() => setPage((value) => value - 1)}>上一页</button><button disabled={page === pages} onClick={() => setPage((value) => value + 1)}>下一页</button></div></div>
+      </section>
+    </section>
+  </section></AdminShell>;
 }

@@ -1,7 +1,7 @@
 import "./admin.css";
 
 export const metadata = {
-  title: "Sai Zhao B2B Growth Console",
+  title: "赛兆运营后台",
   robots: { index: false, follow: false },
 };
 
