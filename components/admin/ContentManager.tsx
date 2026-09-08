@@ -6,7 +6,8 @@ type Item={id:string;title:string;slug:string;status:string;updated_at:string;co
 const statuses=["draft","review","published","archived"];
 export function ContentManager({kind}:{kind:"products"|"articles"}) {
   const label=kind==="products"?"产品":"新闻与内容";
-  const [items,setItems]=useState<Item[]>([]),[total,setTotal]=useState(0),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(20),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);\n  const [range,setRange]=useState<RangePreset>("month"),[customStart,setCustomStart]=useState(""),[customEnd,setCustomEnd]=useState(""),[query,setQuery]=useState(""),[statusFilter,setStatusFilter]=useState("");
+  const [items,setItems]=useState<Item[]>([]),[total,setTotal]=useState(0),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(20),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+  const [range,setRange]=useState<RangePreset>("month"),[customStart,setCustomStart]=useState(""),[customEnd,setCustomEnd]=useState(""),[query,setQuery]=useState(""),[statusFilter,setStatusFilter]=useState("");
   const [form,setForm]=useState({title:"",slug:"",categoryName:"",summary:"",application:"",articleType:"news",content:"",seoTitle:"",seoDescription:"",status:"draft",coverUrl:"",attachmentUrl:""});
   async function load(){const params=new URLSearchParams({page:String(page),pageSize:String(pageSize)});const dates=toRangeQuery(range,customStart,customEnd);params.set("from",dates.from);params.set("to",dates.to);if(query.trim())params.set("q",query.trim());if(statusFilter)params.set("status",statusFilter);const r=await fetch("/api/admin/content/"+kind+"?"+params.toString(),{cache:"no-store"});const j=await r.json();if(r.ok){setItems(j.data);setTotal(j.total);}else setMessage(j.message??"读取失败。");}
   useEffect(()=>{void load();},[page,pageSize,range,customStart,customEnd,query,statusFilter]);
