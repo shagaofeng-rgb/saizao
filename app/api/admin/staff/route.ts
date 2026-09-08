@@ -5,10 +5,14 @@ import { hashAdminPassword, passwordPolicyMessage } from "@/lib/admin-credential
 import { rpc } from "@/lib/supabase-server";
 import { isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getAdminSession();
   if (!session || !canManageStaff(session.role)) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  const staff = await rpc("admin_list_staff", {}).catch(() => null);
+  const search=new URL(request.url).searchParams, now=new Date(), fallback=new Date(now.getTime()-29*86400000);
+  const date=(value:string|null,defaultValue:Date)=>value&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():defaultValue.toISOString();
+  const page=Math.max(1,Number(search.get("page")??1)), pageSize=Math.min(100,Math.max(20,Number(search.get("pageSize")??20)));
+  const role=search.get("role")??"", activeValue=search.get("active"), active=activeValue==="true"?true:activeValue==="false"?false:null;
+  const staff = await rpc("admin_list_staff_page", { p_start:date(search.get("from"),fallback), p_end:date(search.get("to"),now), p_role:role, p_active:active, p_query:search.get("q")??"", p_page:page, p_page_size:pageSize }).catch(() => null);
   return staff ? NextResponse.json({ data: staff }) : NextResponse.json({ message: "无法读取员工账号。" }, { status: 503 });
 }
 export async function POST(request: Request) {
