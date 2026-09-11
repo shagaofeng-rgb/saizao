@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
+import type { GoogleReporting } from "@/lib/google-reporting";
 
 type Metrics = { visitors: number; sessions: number; pageViews: number; leads: number; excluded: number };
 type Visitor = { anonymousId: string; country: string; source: string; visits: number; lastSeen: string; latestPage: string; classification: string; ipMasked: string };
@@ -9,6 +10,7 @@ type Lead = { name: string; company: string; country: string; source: string; cr
 type Dashboard = { metrics: Metrics; countries: { label: string; value: number }[]; sources: { label: string; value: number }[]; pages: { label: string; value: number }[]; visitors: Visitor[]; visitorTotal: number; leads: Lead[] };
 
 const empty: Dashboard = { metrics: { visitors: 0, sessions: 0, pageViews: 0, leads: 0, excluded: 0 }, countries: [], sources: [], pages: [], visitors: [], visitorTotal: 0, leads: [] };
+const emptyGoogle: GoogleReporting = { searchConsole: { state: "not_configured" }, analytics: { state: "not_configured" } };
 
 function date(value: Date) { return value.toISOString().slice(0, 10); }
 const sourceLabels: Record<string, string> = { direct: "直接访问", google: "Google", linkedin: "LinkedIn" };
@@ -25,6 +27,8 @@ export function AdminDashboard() {
   const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState<Dashboard>(empty);
   const [state, setState] = useState<"loading" | "ready" | "setup" | "error">("loading");
+  const [google, setGoogle] = useState<GoogleReporting>(emptyGoogle);
+  const [googleState, setGoogleState] = useState<"loading" | "ready" | "error">("loading");
 
   const load = useCallback(async () => {
     setState("loading");
@@ -41,6 +45,22 @@ export function AdminDashboard() {
 
   useEffect(() => { const timeout = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timeout); }, [load]);
 
+  const loadGoogle = useCallback(async () => {
+    setGoogleState("loading");
+    const response = await fetch(`/api/admin/google?${new URLSearchParams({ from, to })}`, { cache: "no-store" });
+    if (!response.ok) { setGoogleState("error"); return; }
+    const result = await response.json();
+    setGoogle(result.data ?? emptyGoogle);
+    setGoogleState("ready");
+  }, [from, to]);
+
+  useEffect(() => { const timeout = window.setTimeout(() => void loadGoogle(), 0); return () => window.clearTimeout(timeout); }, [loadGoogle]);
+
+  function refresh() {
+    void load();
+    void loadGoogle();
+  }
+
   const totalPages = Math.max(1, Math.ceil(data.visitorTotal / pageSize));
 
   return <AdminShell><section id="main-content" className="admin-content">
@@ -53,8 +73,10 @@ export function AdminDashboard() {
         <label>结束日期<input type="date" value={to} min={from} max={today} onChange={(event) => { setTo(event.target.value); setPage(1); }} /></label>
         <label>国家 / 地区<input value={country} placeholder="如 AE、US、SA" onChange={(event) => { setCountry(event.target.value.toUpperCase()); setPage(1); }} /></label>
         <label>来源渠道<input value={source} placeholder="如 google、linkedin" onChange={(event) => { setSource(event.target.value); setPage(1); }} /></label>
-        <button onClick={load}>应用筛选</button>
+        <button onClick={refresh}>应用筛选</button>
       </section>
+
+      <GooglePanel data={google} state={googleState} onRefresh={refresh} />
 
       {state === "setup" ? <section className="admin-callout"><h2>数据服务尚未连接</h2><p>暂无可用数据。</p></section> : <>
         <section id="overview" className="admin-metrics">
@@ -87,4 +109,29 @@ export function AdminDashboard() {
 
 function Summary({ title, rows, onSelect }: { title: string; rows: { label: string; value: number }[]; onSelect?: (label: string) => void }) {
   return <section className="admin-summary"><h2>{title}</h2>{rows.length ? <ol>{rows.map((row) => <li key={row.label}><button onClick={() => onSelect?.(row.label)} disabled={!onSelect}><span>{row.label}</span><b>{row.value}</b></button></li>)}</ol> : <p>暂无有效数据</p>}</section>;
+}
+
+function GooglePanel({ data, state, onRefresh }: { data: GoogleReporting; state: "loading" | "ready" | "error"; onRefresh: () => void }) {
+  const search = data.searchConsole;
+  const analytics = data.analytics;
+  return <section className="admin-panel admin-google-panel">
+    <div className="admin-panel-heading"><div><h2>Google 数据</h2><p className="admin-panel-subtitle">自然搜索与网站使用情况</p></div><button className="admin-row-action" type="button" onClick={onRefresh} disabled={state === "loading"}>{state === "loading" ? "正在同步…" : "刷新数据"}</button></div>
+    {state === "error" ? <p className="admin-empty">暂时无法读取 Google 数据</p> : <div className="admin-google-grid">
+      <section className="admin-google-section"><h3>Search Console</h3>{search.state === "ready" ? <><div className="admin-google-metrics"><Metric label="点击" value={search.data.totals.clicks} /><Metric label="展示" value={search.data.totals.impressions} /><Metric label="点击率" value={`${(search.data.totals.ctr * 100).toFixed(1)}%`} /><Metric label="平均排名" value={search.data.totals.position.toFixed(1)} /></div><GoogleRows title="热门搜索词" rows={search.data.queries} /><GoogleRows title="热门页面" rows={search.data.pages} /></> : <PanelState value={search.state} />}</section>
+      <section className="admin-google-section"><h3>Google Analytics 4</h3>{analytics.state === "ready" ? <div className="admin-google-metrics admin-google-metrics-four"><Metric label="活跃用户" value={analytics.data.users} /><Metric label="会话" value={analytics.data.sessions} /><Metric label="页面浏览" value={analytics.data.pageViews} /><Metric label="关键事件" value={analytics.data.keyEvents} /></div> : <PanelState value={analytics.state} />}</section>
+    </div>}
+  </section>;
+}
+
+function Metric({ label, value }: { label: string; value: string | number }) {
+  return <div><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function GoogleRows({ title, rows }: { title: string; rows: { keys?: string[]; clicks?: number }[] }) {
+  return <div className="admin-google-rows"><h4>{title}</h4>{rows.length ? <ol>{rows.slice(0, 5).map((row, index) => <li key={`${row.keys?.[0] ?? "row"}-${index}`}><span>{row.keys?.[0] ?? "—"}</span><b>{row.clicks ?? 0}</b></li>)}</ol> : <p>暂无数据</p>}</div>;
+}
+
+function PanelState({ value }: { value: "not_configured" | "not_authorized" | "unavailable" }) {
+  const labels = { not_configured: "尚未配置", not_authorized: "尚未授权", unavailable: "暂时不可用" };
+  return <p className="admin-google-state">{labels[value]}</p>;
 }
