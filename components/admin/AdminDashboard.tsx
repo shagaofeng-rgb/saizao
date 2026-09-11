@@ -19,7 +19,11 @@ function displayValue(value: string, fallback: string) { return value ? sourceLa
 
 export function AdminDashboard() {
   const today = date(new Date());
-  const [from, setFrom] = useState(today);
+  const [from, setFrom] = useState(() => {
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - 27);
+    return date(start);
+  });
   const [to, setTo] = useState(today);
   const [country, setCountry] = useState("");
   const [source, setSource] = useState("");
