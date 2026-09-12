@@ -7,8 +7,8 @@ import { ChartPieSlice, Handshake, NewspaperClipping, Package, ShieldCheck, Sign
 
 const navigation = [
   { href: "/admin", label: "业务概览", icon: ChartPieSlice },
-  { href: "/admin#visitors", label: "访客记录", icon: Users },
-  { href: "/admin#leads", label: "询盘管理", icon: Handshake },
+  { href: "/admin/visitors", label: "访客中心", icon: Users },
+  { href: "/admin/inquiries", label: "询盘管理", icon: Handshake },
   { href: "/admin/products", label: "产品内容", icon: Package },
   { href: "/admin/news", label: "资讯内容", icon: NewspaperClipping },
   { href: "/admin/staff", label: "团队账号", icon: UsersFour },
@@ -35,7 +35,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <nav aria-label="后台导航">
           <p className="admin-nav-label">工作台</p>
           {navigation.slice(0, 3).map((item) => (
-            <Link key={item.href} className={pathname === "/admin" && item.href.startsWith("/admin#") ? "" : pathname === item.href ? "active" : ""} href={item.href}><item.icon weight="bold" aria-hidden="true" />{item.label}</Link>
+            <Link key={item.href} className={pathname === item.href ? "active" : ""} href={item.href}><item.icon weight="bold" aria-hidden="true" />{item.label}</Link>
           ))}
           <p className="admin-nav-label">内容管理</p>
           {navigation.slice(3).map((item) => (
