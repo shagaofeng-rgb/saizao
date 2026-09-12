@@ -98,7 +98,7 @@ export function ContentManager({ kind }: { kind: "products" | "articles" }) {
           <label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "coverUrl")} />{form.coverUrl && <small>已上传</small>}</label>
           <label>附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "attachmentUrl")} />{form.attachmentUrl && <small>已上传</small>}</label>
         </div>
-        <details><summary>SEO 设置</summary><label>SEO 标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>SEO 描述<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
+        <details><summary>搜索展示设置</summary><label>搜索标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>搜索摘要<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
         <button className="admin-primary" disabled={busy}>{busy ? "正在保存…" : `保存${label}`}</button>
         <div aria-live="polite">{message && <p className="admin-feedback">{message}</p>}</div>
       </form>
