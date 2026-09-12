@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { hasAdminSession } from "@/lib/admin-session";
-import { isSupabaseConfigured, rpc } from "@/lib/supabase-server";
+import { getAdminSession } from "@/lib/admin-session";
+import { rpc } from "@/lib/supabase-server";
 
-function iso(value:string|null,fallback:Date){const parsed=value?new Date(value):fallback;return Number.isNaN(parsed.getTime())?fallback.toISOString():parsed.toISOString();}
-export async function GET(request:Request){
- if(!(await hasAdminSession())) return NextResponse.json({message:"Unauthorized"},{status:401});
- if(!isSupabaseConfigured()) return NextResponse.json({message:"数据服务尚未配置。"},{status:503});
- const q=new URL(request.url).searchParams, now=new Date(), start=new Date(now.getTime()-29*86400000);
- const data=await rpc("admin_list_visitors",{p_start:iso(q.get("from"),start),p_end:iso(q.get("to"),now),p_country:q.get("country")||null,p_source:q.get("source")||null,p_query:q.get("q")||null,p_page:Math.max(Number(q.get("page")||1),1),p_page_size:Math.min(Math.max(Number(q.get("pageSize")||20),20),100)}).catch(()=>null);
- return data?NextResponse.json({data}):NextResponse.json({message:"无法读取访客数据。"},{status:503});
+const date = (value: string | null, fallback: Date) => { const parsed = value ? new Date(value) : fallback; return Number.isNaN(parsed.getTime()) ? fallback.toISOString() : parsed.toISOString(); };
+
+export async function GET(request: Request) {
+  if (!(await getAdminSession())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  const search = new URL(request.url).searchParams;
+  const now = new Date(); const start = new Date(now); start.setUTCDate(start.getUTCDate() - 27);
+  const data = await rpc("admin_list_visitors", { p_from: date(search.get("from"), start), p_to: date(search.get("to"), now), p_country: search.get("country") || null, p_source: search.get("source") || null, p_query: search.get("q")?.trim().slice(0, 80) || null, p_page: Math.max(1, Number(search.get("page") || 1)), p_page_size: Math.min(100, Math.max(20, Number(search.get("pageSize") || 20))) }).catch(() => null);
+  return data ? NextResponse.json({ data }) : NextResponse.json({ message: "暂时无法读取访客记录。" }, { status: 503 });
 }

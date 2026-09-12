@@ -10,3 +10,4 @@ output/
 .learnings/
 .vercel
 .env*
+tsconfig.tsbuildinfo
