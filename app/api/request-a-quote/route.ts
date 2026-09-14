@@ -49,6 +49,8 @@ export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   if (!form) return Response.json({ message: "We could not read the submitted form." }, { status: 400 });
   if (field(form, "website", 200)) return Response.json({ message: "Thank you—your request has been received." });
+  const metaEventId = field(form, "metaEventId", 160) || null;
+  const metaTrackingAllowed = field(form, "metaTrackingAllowed", 10) === "yes";
 
   const lead = {
     name: field(form, "name", 160),
@@ -84,7 +86,9 @@ export async function POST(request: Request) {
     after(async () => {
       const notification = await notifyTeam(lead);
       await recordLeadNotification(result.id, notification).catch(() => undefined);
-      await sendMetaLeadEvent({ name: lead.name, email: lead.email, phone: lead.phone, application: lead.application, pagePath: lead.page_path, userAgent: request.headers.get("user-agent"), ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, fbp: metaCookie(request.headers.get("cookie"), "_fbp"), fbc: metaCookie(request.headers.get("cookie"), "_fbc") }).catch(() => undefined);
+      if (metaTrackingAllowed) {
+        await sendMetaLeadEvent({ name: lead.name, email: lead.email, phone: lead.phone, application: lead.application, pagePath: lead.page_path, userAgent: request.headers.get("user-agent"), ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null, fbp: metaCookie(request.headers.get("cookie"), "_fbp"), fbc: metaCookie(request.headers.get("cookie"), "_fbc"), eventId: metaEventId }).catch(() => undefined);
+      }
     });
   } catch {
     return Response.json({ message: `We could not save your request right now. Please call ${company.telephone}.` }, { status: 503 });
