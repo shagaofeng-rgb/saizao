@@ -4,8 +4,19 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { ArrowUpRight, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 
+type MetaPixel = ((...args: unknown[]) => void) | undefined;
+
+function trackMetaLead(eventId: string, application: string) {
+  const fbq = (window as Window & { fbq?: MetaPixel }).fbq;
+  fbq?.("track", "Lead", { content_name: application || "Fragrance enquiry", content_category: "B2B enquiry" }, { eventID: eventId });
+}
+
 function visitorId() {
   return document.cookie.split("; ").find((value) => value.startsWith("sz_visitor_id="))?.split("=")[1] ?? "";
+}
+
+function optionalMeasurementAllowed() {
+  return localStorage.getItem("sz_measurement_consent_v2") === "granted";
 }
 
 export function QuoteForm() {
@@ -20,15 +31,21 @@ export function QuoteForm() {
 
     const form = new FormData(formElement);
     const url = new URL(window.location.href);
+    const metaEventId = crypto.randomUUID();
+    const application = String(form.get("application") ?? "");
+    const measurementAllowed = optionalMeasurementAllowed();
     form.set("pagePath", url.pathname);
     form.set("referrer", document.referrer);
     form.set("anonymousId", visitorId());
+    form.set("metaEventId", metaEventId);
+    form.set("metaTrackingAllowed", measurementAllowed ? "yes" : "no");
     ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((key) => form.set(key, url.searchParams.get(key) ?? ""));
 
     try {
       const response = await fetch("/api/request-a-quote", { method: "POST", body: form });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "We could not submit your brief. Please try again.");
+      if (measurementAllowed) trackMetaLead(metaEventId, application);
       setStatus("sent");
       setMessage(result.message);
       formElement.reset();
