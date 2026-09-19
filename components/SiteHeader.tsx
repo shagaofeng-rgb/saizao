@@ -12,16 +12,40 @@ export function SiteHeader() {
   const [applicationMenu, setApplicationMenu] = useState(false);
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
+  const menuCloseTimer = useRef<number | null>(null);
+
+  const canHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const clearMenuCloseTimer = () => {
+    if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
+    menuCloseTimer.current = null;
+  };
+  const openApplicationsMenu = () => {
+    clearMenuCloseTimer();
+    setApplicationMenu(true);
+  };
+  const scheduleApplicationsClose = () => {
+    if (!canHover()) return;
+    clearMenuCloseTimer();
+    menuCloseTimer.current = window.setTimeout(() => setApplicationMenu(false), 160);
+  };
+
+  useEffect(() => () => clearMenuCloseTimer(), []);
 
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        setApplicationMenu(false);
+      }
     };
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (headerRef.current && !headerRef.current.contains(event.target as Node)) setOpen(false);
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setApplicationMenu(false);
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     window.addEventListener("mousedown", closeOnOutsideClick);
@@ -43,12 +67,12 @@ export function SiteHeader() {
       </button>
       <nav id="primary-navigation" className={open ? "nav nav-open" : "nav"} aria-label="Primary navigation">
         {primaryNav.map((item) => item.href === "/applications" ? (
-          <div className="nav-mega" key={item.href}>
+          <div className="nav-mega" key={item.href} onPointerEnter={() => { if (canHover()) openApplicationsMenu(); }} onPointerLeave={scheduleApplicationsClose}>
             <div className="nav-mega-trigger">
-              <Link href={item.href} aria-current={pathname.startsWith("/applications") ? "page" : undefined} className={pathname.startsWith("/applications") ? "nav-active" : ""} onClick={() => { setOpen(false); setApplicationMenu(false); }}>{item.label}</Link>
-              <button type="button" aria-label={applicationMenu ? "Close applications menu" : "Open applications menu"} aria-expanded={applicationMenu} aria-controls="applications-menu" onClick={() => setApplicationMenu((value) => !value)}><CaretDown size={13} weight="bold" /></button>
+              <Link href={item.href} aria-current={pathname.startsWith("/applications") ? "page" : undefined} className={pathname.startsWith("/applications") ? "nav-active" : ""} onFocus={openApplicationsMenu} onClick={() => { setOpen(false); setApplicationMenu(false); }}>{item.label}</Link>
+              <button type="button" aria-label={applicationMenu ? "Close applications menu" : "Open applications menu"} aria-expanded={applicationMenu} aria-controls="applications-menu" onFocus={openApplicationsMenu} onClick={() => { clearMenuCloseTimer(); setApplicationMenu((value) => !value); }}><CaretDown size={13} weight="bold" /></button>
             </div>
-            <div id="applications-menu" className={applicationMenu ? "mega-panel mega-panel-open" : "mega-panel"}>
+            <div id="applications-menu" className={applicationMenu ? "mega-panel mega-panel-open" : "mega-panel"} onFocus={openApplicationsMenu}>
               <p>Choose your product route</p>
               <div>{applications.map((application) => <Link key={application.slug} href={`/applications/${application.slug}`} onClick={() => { setOpen(false); setApplicationMenu(false); }}><span>{application.title}</span><small>{application.description}</small></Link>)}</div>
             </div>
