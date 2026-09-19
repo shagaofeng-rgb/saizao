@@ -9,6 +9,7 @@ const sessionKey = "sz_session_id";
 const consentKey = "sz_measurement_consent_v2";
 type Consent = "granted" | "denied" | null;
 const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
+const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
 
 type MetaPixel = ((...args: unknown[]) => void) & {
   callMethod?: (...args: unknown[]) => void;
@@ -17,10 +18,14 @@ type MetaPixel = ((...args: unknown[]) => void) & {
   version?: string;
 };
 
+type GoogleTag = (...args: unknown[]) => void;
+
 declare global {
   interface Window {
     fbq?: MetaPixel;
     _fbq?: MetaPixel;
+    dataLayer?: unknown[];
+    gtag?: GoogleTag;
   }
 }
 
@@ -86,10 +91,42 @@ function loadMetaPixel(onReady: () => void) {
   document.head.appendChild(script);
 }
 
+function loadGoogleAnalytics(onReady: () => void) {
+  if (!googleAnalyticsId) return;
+  if (document.documentElement.dataset.googleAnalyticsReady === "true") {
+    onReady();
+    return;
+  }
+
+  const initialize = () => {
+    if (document.documentElement.dataset.googleAnalyticsReady === "true") return;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = (...args: unknown[]) => window.dataLayer?.push(args);
+    window.gtag("js", new Date());
+    window.gtag("config", googleAnalyticsId, { send_page_view: false });
+    document.documentElement.dataset.googleAnalyticsReady = "true";
+    onReady();
+  };
+
+  const existing = document.getElementById("google-analytics-script");
+  if (existing) {
+    existing.addEventListener("load", initialize, { once: true });
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.id = "google-analytics-script";
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleAnalyticsId)}`;
+  script.addEventListener("load", initialize, { once: true });
+  document.head.appendChild(script);
+}
+
 export function AnalyticsTracker() {
   const pathname = usePathname();
   const [consent, setConsent] = useState<Consent | undefined>(undefined);
   const [pixelReady, setPixelReady] = useState(false);
+  const [googleAnalyticsReady, setGoogleAnalyticsReady] = useState(false);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -131,6 +168,20 @@ export function AnalyticsTracker() {
   }, [consent, pathname]);
 
   useEffect(() => {
+    if (consent !== "granted" || !pathname || pathname.startsWith("/admin")) return;
+    loadGoogleAnalytics(() => setGoogleAnalyticsReady(true));
+  }, [consent, pathname]);
+
+  useEffect(() => {
+    if (!googleAnalyticsReady || !pathname || pathname.startsWith("/admin")) return;
+    window.gtag?.("event", "page_view", {
+      page_path: pathname,
+      page_location: window.location.href,
+      page_title: document.title,
+    });
+  }, [googleAnalyticsReady, pathname]);
+
+  useEffect(() => {
     if (!pixelReady || !pathname || pathname.startsWith("/admin")) return;
     window.fbq?.("track", "PageView");
     if (pathname.startsWith("/products/") || pathname.startsWith("/applications/")) {
@@ -142,17 +193,18 @@ export function AnalyticsTracker() {
   }, [pixelReady, pathname]);
 
   useEffect(() => {
-    if (!pixelReady) return;
+    if (!pixelReady && !googleAnalyticsReady) return;
     const trackContact = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       const href = target?.getAttribute("href")?.toLowerCase() ?? "";
       if (!href.startsWith("tel:") && !href.startsWith("mailto:") && !href.includes("wa.me") && !href.includes("whatsapp")) return;
       const channel = href.startsWith("tel:") ? "Phone" : href.startsWith("mailto:") ? "Email" : "Messaging";
       window.fbq?.("track", "Contact", { content_name: channel, content_category: "Business contact" });
+      window.gtag?.("event", "contact", { contact_method: channel });
     };
     document.addEventListener("click", trackContact);
     return () => document.removeEventListener("click", trackContact);
-  }, [pixelReady]);
+  }, [pixelReady, googleAnalyticsReady]);
 
   function choose(value: Exclude<Consent, null>) {
     localStorage.setItem(consentKey, value);
