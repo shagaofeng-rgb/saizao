@@ -3,13 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, CaretDown, List, X } from "@phosphor-icons/react";
+import { ArrowUpRight, CaretDown, List, ShoppingBag, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { applications, primaryNav } from "@/lib/site-data";
+import { readCart } from "@/lib/retail-cart";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [applicationMenu, setApplicationMenu] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
@@ -30,6 +32,11 @@ export function SiteHeader() {
   };
 
   useEffect(() => () => clearMenuCloseTimer(), []);
+  useEffect(() => {
+    const sync = () => setCartCount(readCart().reduce((sum, item) => sum + item.quantity, 0));
+    sync(); window.addEventListener("saizhao-cart-change", sync); window.addEventListener("storage", sync);
+    return () => { window.removeEventListener("saizhao-cart-change", sync); window.removeEventListener("storage", sync); };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +88,7 @@ export function SiteHeader() {
           <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "nav-active" : ""} onClick={() => setOpen(false)}>{item.label}</Link>
         ))}
       </nav>
+      <Link className="header-cart" href="/cart" aria-label={`Cart, ${cartCount} items`}><ShoppingBag size={22}/>{cartCount > 0 && <span>{cartCount}</span>}</Link>
       <Link className="button button-small header-cta" href="/request-a-quote">Share Your Brief <ArrowUpRight size={16} /></Link>
     </header>
   );

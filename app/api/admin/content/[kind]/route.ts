@@ -48,6 +48,10 @@ export async function PATCH(request:Request,{params}:{params:Promise<{kind:strin
   const body=await request.json().catch(()=>({})); if(typeof body.id!=="string") return NextResponse.json({message:"缺少内容编号。"},{status:400});
   const status=["draft","review","published","archived"].includes(body.status)?body.status:null;
   if(!status) return NextResponse.json({message:"无效状态。"},{status:400});
+  if(table === "products" && status === "published") {
+    const current = await rest<{is_demo:boolean}[]>(`products?select=is_demo&id=eq.${encodeURIComponent(body.id)}&limit=1`).catch(()=>null);
+    if(current?.data[0]?.is_demo) return NextResponse.json({message:"设计示例不能直接发布，请新建真实商品。"},{status:400});
+  }
   const saved=await rest<Record<string,unknown>[]>(`${table}?id=eq.${encodeURIComponent(body.id)}`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({status,published_at:status==="published"?new Date().toISOString():null,updated_at:new Date().toISOString(),updated_by:session.accountId})}).catch(()=>null);
   if(!saved?.data[0]) return NextResponse.json({message:"更新失败。"},{status:400});
   await rpc("admin_log_audit",{p_actor_id:session.accountId,p_action:"content_status_changed",p_entity_type:table,p_entity_id:body.id,p_metadata:{status}}).catch(()=>undefined);

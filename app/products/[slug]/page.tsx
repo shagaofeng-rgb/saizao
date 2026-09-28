@@ -1,1 +1,16 @@
-import { notFound } from "next/navigation"; import Link from "next/link"; import { SiteHeader } from "@/components/SiteHeader"; import { SiteFooter } from "@/components/SiteFooter"; import { publishedProduct } from "@/lib/published-content"; export const revalidate=60; export default async function Product({params}:{params:Promise<{slug:string}>}){const item=await publishedProduct((await params).slug);if(!item)notFound();return <><SiteHeader/><main id="main-content" className="detail-page"><article><p className="eyebrow">{item.content_categories?.name??item.application??"PRODUCT"}</p><h1>{item.title}</h1>{item.cover_url&&<img className="detail-cover" src={item.cover_url} alt={item.title} width={1600} height={900} decoding="async"/>}<p className="detail-intro">{item.summary}</p><div className="detail-content">{item.content.split(/\n{2,}/).map((p,i)=><p key={i}>{p}</p>)}</div>{item.attachment_url&&<a className="text-link" href={item.attachment_url} target="_blank" rel="noreferrer">Download technical file</a>}<Link className="button" href="/request-a-quote">Share Your Brief</Link></article></main><SiteFooter/></>}
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { ProductDetailView } from "@/components/retail/ProductDetailView";
+import { getRelatedRetailProducts, getRetailProductBySlug } from "@/lib/retail-data";
+
+export const revalidate = 60;
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const product = await getRetailProductBySlug((await params).slug);
+  return product ? { title: product.seo_title || product.title, description: product.seo_description || product.summary || undefined, robots: product.is_demo ? { index: false } : undefined } : {};
+}
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const product = await getRetailProductBySlug((await params).slug);
+  if (!product || product.is_demo) notFound();
+  const related = await getRelatedRetailProducts(product.detail.relatedSlugs, product.id);
+  return <ProductDetailView product={product} related={related} />;
+}

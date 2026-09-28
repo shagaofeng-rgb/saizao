@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState } from "react";
-import { ChartPieSlice, Handshake, NewspaperClipping, Package, ShieldCheck, SignOut, Users, UsersFour } from "@phosphor-icons/react";
+import { ChartPieSlice, Handshake, NewspaperClipping, Package, ShieldCheck, SignOut, Truck, ShoppingBag, Users, UsersFour } from "@phosphor-icons/react";
 
 const navigation = [
   { href: "/admin", label: "业务概览", icon: ChartPieSlice },
   { href: "/admin/visitors", label: "访客中心", icon: Users },
   { href: "/admin/inquiries", label: "询盘管理", icon: Handshake },
   { href: "/admin/products", label: "产品内容", icon: Package },
+  { href: "/admin/orders", label: "零售订单", icon: ShoppingBag },
+  { href: "/admin/shipping", label: "配送区域", icon: Truck },
   { href: "/admin/news", label: "资讯内容", icon: NewspaperClipping },
   { href: "/admin/staff", label: "团队账号", icon: UsersFour },
 ];
