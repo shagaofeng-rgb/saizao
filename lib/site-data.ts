@@ -6,7 +6,10 @@ export const company = {
   contactName: "Wang Jiahong",
   telephone: "+86 137 0178 0563",
   telephoneHref: "tel:+8613701780563",
+  whatsAppUrl: "https://wa.me/8613701780563",
   address: "No. 13, Xinggong North Road, Jiangshan Economic Development Zone (Jiangdong District), Quzhou, Zhejiang, China 324100",
+  googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=28.808416854519283%2C118.72345789315749",
+  googleMapsEmbedUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2988.4615546210753!2d118.72345789315749!3d28.808416854519283!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3448212a0f72457d%3A0xefb78d3325541895!2s13%20Xinggong%20N%20Rd%2C%20Jiang%20Shan%20Shi%2C%20Qu%20Zhou%20Shi%2C%20Zhe%20Jiang%20Sheng%2C%20China%2C%20324013!5e1!3m2!1sen!2suk!4v1789374963899!5m2!1sen!2suk",
 };
 
 export const primaryNav = [

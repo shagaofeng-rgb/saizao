@@ -8,3 +8,6 @@ dist/
 output/
 .impeccable/
 .learnings/
+.vercel
+.env*
+tsconfig.tsbuildinfo

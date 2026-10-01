@@ -3,11 +3,12 @@ import type { NextConfig } from "next";
 const isDevelopment = process.env.NODE_ENV === "development";
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://connect.facebook.net https://www.googletagmanager.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://*.supabase.co https://www.facebook.com",
   "font-src 'self' data:",
-  `connect-src 'self'${isDevelopment ? " ws:" : ""}`,
+  `connect-src 'self' https://www.facebook.com https://www.google-analytics.com https://region1.google-analytics.com${isDevelopment ? " ws:" : ""}`,
+  "frame-src 'self' https://www.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -31,6 +32,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
+    remotePatterns: [{ protocol: "https", hostname: "pohsefmowgthjskmbkyg.supabase.co", pathname: "/storage/v1/object/public/website-media/**" }],
   },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

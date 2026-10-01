@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 type Item = {
@@ -98,13 +99,13 @@ export function ContentManager({ kind }: { kind: "products" | "articles" }) {
           <label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "coverUrl")} />{form.coverUrl && <small>已上传</small>}</label>
           <label>附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "attachmentUrl")} />{form.attachmentUrl && <small>已上传</small>}</label>
         </div>
-        <details><summary>SEO 设置</summary><label>SEO 标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>SEO 描述<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
+        <details><summary>搜索展示设置</summary><label>搜索标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>搜索摘要<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
         <button className="admin-primary" disabled={busy}>{busy ? "正在保存…" : `保存${label}`}</button>
         <div aria-live="polite">{message && <p className="admin-feedback">{message}</p>}</div>
       </form>
       <section className="admin-panel admin-list-panel">
         <div className="admin-panel-heading"><h2>{label}列表</h2><label>每页<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10 条</option><option value={25}>25 条</option><option value={50}>50 条</option></select></label></div>
-        <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>{items.length ? items.map((item) => <tr key={item.id}><td><b>{item.title}</b><small>/{kind === "products" ? "products" : "news"}/{item.slug}</small></td><td>{item.content_categories?.name ?? "—"}</td><td><span className="admin-tag">{statusLabels[item.status] ?? item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString("zh-CN")}</td><td><select value={item.status} aria-label={`${item.title}的发布状态`} onChange={(event) => void changeStatus(item.id, event.target.value)}>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></td></tr>) : <tr><td colSpan={5} className="admin-empty">暂无{label}</td></tr>}</tbody></table></div>
+        <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>{items.length ? items.map((item) => <tr key={item.id}><td><b>{item.title}</b><small>/{kind === "products" ? "products" : "news"}/{item.slug}</small></td><td>{item.content_categories?.name ?? "—"}</td><td><span className="admin-tag">{statusLabels[item.status] ?? item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString("zh-CN")}</td><td>{kind === "products" && <Link href={`/admin/products/${item.id}`}>编辑详情</Link>} <select value={item.status} aria-label={`${item.title}的发布状态`} onChange={(event) => void changeStatus(item.id, event.target.value)}>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></td></tr>) : <tr><td colSpan={5} className="admin-empty">暂无{label}</td></tr>}</tbody></table></div>
         <div className="admin-pagination"><span>共 {total} 条 · 第 {page}/{pages} 页</span><div><button disabled={page === 1} onClick={() => setPage((value) => value - 1)}>上一页</button><button disabled={page === pages} onClick={() => setPage((value) => value + 1)}>下一页</button></div></div>
       </section>
     </section>
