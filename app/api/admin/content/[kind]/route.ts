@@ -18,8 +18,14 @@ export async function GET(request:Request,{params}:{params:Promise<{kind:string}
   const session=await getAdminSession(); const table=await tableFrom(params);
   if(!session||!table) return NextResponse.json({message:"Unauthorized"},{status:401});
   const search=new URL(request.url).searchParams, page=Math.max(1,Number(search.get("page")??1)), pageSize=Math.min(100,Math.max(10,Number(search.get("pageSize")??25)));
-  const term=search.get("q")?.trim(), status=search.get("status")?.trim();
-  const filters=[status&&["draft","review","published","archived"].includes(status)?`status=eq.${status}`:null,term?`title=ilike.*${encodeURIComponent(term.replace(/[,*()]/g,""))}*`:null].filter(Boolean).join("&");
+  const term=search.get("q")?.trim(), status=search.get("status")?.trim(), from=search.get("from")?.trim(), to=search.get("to")?.trim();
+  const validDate=(value:string|undefined)=>Boolean(value&&Number.isFinite(Date.parse(value)));
+  const filters=[
+    status&&["draft","review","published","archived"].includes(status)?"status=eq."+status:null,
+    term?"title=ilike.*"+encodeURIComponent(term.replace(/[,*()]/g,""))+"*":null,
+    validDate(from)?"updated_at=gte."+encodeURIComponent(new Date(from as string).toISOString()):null,
+    validDate(to)?"updated_at=lte."+encodeURIComponent(new Date(to as string).toISOString()):null
+  ].filter(Boolean).join("&");
   const fields=table==="products"?"id,title,slug,status,updated_at,published_at,cover_url,summary,application,content_categories(name)":"id,title,slug,status,updated_at,published_at,cover_url,excerpt,article_type,content_categories(name)";
   const response=await rest<Record<string,unknown>[]>(`${table}?select=${fields}&order=updated_at.desc&limit=${pageSize}&offset=${(page-1)*pageSize}${filters?`&${filters}`:""}`,{headers:{Prefer:"count=exact"}}).catch(()=>null);
   if(!response) return NextResponse.json({message:"无法读取内容。"},{status:503});
