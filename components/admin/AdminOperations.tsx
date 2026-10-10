@@ -8,7 +8,7 @@ import { AdminDateRange } from "@/components/admin/AdminDateRange";
 import { AdminDateRangeValue, adminDateQuery, adminDateRange, validAdminDateRange } from "@/lib/admin-date-range";
 
 type PageData<T> = { total: number; items: T[] };
-type Visitor = { id: string; country: string; source: string; sessions: number; pageViews: number; lastSeen: string; latestPage: string };
+type Visitor = { id: string; country: string; latestSource: string; sessionCount: number; firstLandingPage: string; lastSeenAt: string };
 type Lead = { id: string; name: string; company: string; email: string; country: string; application?: string; source: string; status: string; createdAt: string; nextFollowUpAt?: string | null };
 type VisitorDetailData = { visitor: { firstSeen: string; lastSeen: string } | null; sessions: { id: string }[]; events: { at: string; page: string; title?: string }[]; leads: { id: string; name: string; company: string; status: string }[] };
 type LeadDetailData = { lead: { name: string; company: string; email: string; phone?: string; country_name?: string; country_code?: string; application?: string; brief?: string; status: string; created_at?: string; next_follow_up_at?: string; visitorId?: string } | null; notes: { id: string; createdAt: string; stage?: string; note: string }[] };
@@ -19,6 +19,7 @@ const source = (value?: string) => sourceLabels[value ?? ""] ?? value ?? "直接
 const statusLabels: Record<string, string> = { New: "新询盘", Processing: "处理中", Contacted: "已联系", Qualified: "有效商机", Closed: "已完成", Invalid: "无效" };
 const status = (value: string) => statusLabels[value] ?? value;
 const localDateTime = (value?: string) => { if (!value) return ""; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+const utcDateTime = (value?: string) => value ? new Date(value).toISOString().slice(0, 16).replace("T", " ") : "—";
 
 function Pagination({ page, pageSize, total, onPage, onSize }: { page: number; pageSize: number; total: number; onPage: (value: number) => void; onSize: (value: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -58,10 +59,10 @@ export function VisitorCenter() {
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>访客中心</h1><p className="admin-subtitle">查看已记录的有效访问与页面轨迹。</p></div></header>
-    <section className="admin-filters" aria-label="访客筛选"><AdminDateRange id="visitors" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="国家、来源或页面" /></label><label>国家 / 地区<input value={country} onChange={(event) => { setCountry(event.target.value.toUpperCase()); setPage(1); }} /></label><label>来源渠道<input value={sourceValue} onChange={(event) => { setSource(event.target.value); setPage(1); }} /></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><Funnel aria-hidden="true" />查询</button></section>
+    <section className="admin-filters" aria-label="访客筛选"><AdminDateRange id="visitors" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="访客标识或脱敏 IP" /></label><label>国家 / 地区<input value={country} onChange={(event) => { setCountry(event.target.value.toUpperCase()); setPage(1); }} /></label><label>来源渠道<input value={sourceValue} onChange={(event) => { setSource(event.target.value); setPage(1); }} /></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><Funnel aria-hidden="true" />查询</button></section>
     <section className="admin-panel"><div className="admin-panel-heading"><div><h2>访客记录</h2><p className="admin-panel-subtitle">来源：站内访问记录。按匿名访客汇总，不显示完整 IP。</p></div></div>
-      <div className="admin-table-scroll"><table><thead><tr><th>国家/地区</th><th>来源</th><th>会话</th><th>页面浏览</th><th>最近页面</th><th>最近访问（UTC）</th><th>操作</th></tr></thead><tbody>
-        {state === "loading" ? <tr><td colSpan={7} className="admin-empty">正在读取访客记录…</td></tr> : state === "error" ? <tr><td colSpan={7} className="admin-empty" role="alert">读取失败。请重试，当前不显示旧数据。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td>{item.country}</td><td>{source(item.source)}</td><td>{item.sessions}</td><td>{item.pageViews}</td><td className="admin-path">{item.latestPage}</td><td>{item.lastSeen}</td><td><Link className="admin-row-action" href={`/admin/visitors/${item.id}`}><Eye aria-hidden="true" />查看详情</Link></td></tr>) : <tr><td colSpan={7} className="admin-empty">所选条件下暂无访客记录</td></tr>}
+      <div className="admin-table-scroll"><table><thead><tr><th>国家/地区</th><th>来源</th><th>会话</th><th>首次进入页面</th><th>最近访问（UTC）</th><th>操作</th></tr></thead><tbody>
+        {state === "loading" ? <tr><td colSpan={6} className="admin-empty">正在读取访客记录…</td></tr> : state === "error" ? <tr><td colSpan={6} className="admin-empty" role="alert">读取失败。请重试，当前不显示旧数据。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td>{item.country}</td><td>{source(item.latestSource)}</td><td>{item.sessionCount}</td><td className="admin-path">{item.firstLandingPage}</td><td>{utcDateTime(item.lastSeenAt)}</td><td><Link className="admin-row-action" href={`/admin/visitors/${item.id}`}><Eye aria-hidden="true" />查看详情</Link></td></tr>) : <tr><td colSpan={6} className="admin-empty">所选条件下暂无访客记录</td></tr>}
       </tbody></table></div>{state === "error" && <button className="admin-row-action" type="button" onClick={() => void load()}>重试</button>}{state === "ready" && data && <Pagination page={page} pageSize={pageSize} total={data.total} onPage={setPage} onSize={setPageSize} />}</section>
   </section></AdminShell>;
 }
