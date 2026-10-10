@@ -13,7 +13,7 @@ export function RetailProductEditor({ id }: { id: string }) {
   const [product, setProduct] = useState<RetailProduct | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useEffect(() => { fetch(`/api/admin/retail/products/${id}`, { cache: "no-store" }).then((r) => r.json()).then((v) => setProduct(v.data ?? null)).catch(() => setMessage("无法加载产品。")); }, [id]);
+  useEffect(() => { fetch(`/api/admin/retail/products/${id}`, { cache: "no-store" }).then(async (response) => { const result = await response.json(); if (!response.ok || !result.data) throw new Error("unavailable"); setProduct(result.data); }).catch(() => setMessage("无法加载商品记录，请返回产品内容后重试。")); }, [id]);
   function update<K extends keyof RetailProduct>(key: K, value: RetailProduct[K]) { setProduct((p) => p ? { ...p, [key]: value } : p); }
   function detail<K extends keyof typeof emptyProductDetail>(key: K, value: typeof emptyProductDetail[K]) { setProduct((p) => p ? { ...p, detail: { ...p.detail, [key]: value } } : p); }
   async function upload(file: File, target: "cover_url" | "hero_url" | "gallery" | "application" | "packaging" | "download") {

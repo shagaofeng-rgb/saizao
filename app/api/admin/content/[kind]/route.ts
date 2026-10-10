@@ -26,7 +26,7 @@ export async function GET(request:Request,{params}:{params:Promise<{kind:string}
     validDate(from)?"updated_at=gte."+encodeURIComponent(new Date(from as string).toISOString()):null,
     validDate(to)?"updated_at=lte."+encodeURIComponent(new Date(to as string).toISOString()):null
   ].filter(Boolean).join("&");
-  const fields=table==="products"?"id,title,slug,status,updated_at,published_at,cover_url,summary,application,content_categories(name)":"id,title,slug,status,updated_at,published_at,cover_url,excerpt,article_type,content_categories(name)";
+  const fields=table==="products"?"id,title,slug,status,is_demo,updated_at,published_at,cover_url,summary,application,content_categories(name)":"id,title,slug,status,updated_at,published_at,cover_url,excerpt,article_type,content_categories(name)";
   const response=await rest<Record<string,unknown>[]>(`${table}?select=${fields}&order=updated_at.desc&limit=${pageSize}&offset=${(page-1)*pageSize}${filters?`&${filters}`:""}`,{headers:{Prefer:"count=exact"}}).catch(()=>null);
   if(!response) return NextResponse.json({message:"无法读取内容。"},{status:503});
   const range=response.response.headers.get("content-range")??"0-0/0", total=Number(range.split("/")[1]??0);
