@@ -10,25 +10,35 @@ import { readCart } from "@/lib/retail-cart";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const [applicationMenu, setApplicationMenu] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<"products" | "applications" | null>(null);
+  const [productCategories, setProductCategories] = useState<{ name: string; slug: string }[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
 
-  const canHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const canHover = () => window.matchMedia("(min-width: 1191px) and (hover: hover) and (pointer: fine)").matches;
   const clearMenuCloseTimer = () => {
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     menuCloseTimer.current = null;
   };
-  const openApplicationsMenu = () => {
+  const openMenu = (menu: "products" | "applications") => {
     clearMenuCloseTimer();
-    setApplicationMenu(true);
+    setActiveMenu(menu);
   };
-  const scheduleApplicationsClose = () => {
+  const closeMenu = () => {
+    clearMenuCloseTimer();
+    setActiveMenu(null);
+  };
+  const closeNavigation = () => {
+    setOpen(false);
+    closeMenu();
+  };
+  const scheduleMenuClose = () => {
     if (!canHover()) return;
     clearMenuCloseTimer();
-    menuCloseTimer.current = window.setTimeout(() => setApplicationMenu(false), 160);
+    menuCloseTimer.current = window.setTimeout(() => setActiveMenu(null), 160);
   };
 
   useEffect(() => () => clearMenuCloseTimer(), []);
@@ -39,29 +49,46 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (activeMenu !== "products" || categoriesLoaded) return;
+    const controller = new AbortController();
+    fetch("/api/shop/product-navigation", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Product navigation unavailable");
+        return response.json();
+      })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setProductCategories(Array.isArray(result.categories) ? result.categories.filter((item: { name?: unknown; slug?: unknown }) => typeof item.name === "string" && typeof item.slug === "string") : []);
+        setCategoriesLoaded(true);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [activeMenu, categoriesLoaded]);
+
+  useEffect(() => {
+    if (!open && !activeMenu) return;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (open) document.body.style.overflow = "hidden";
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
-        setApplicationMenu(false);
+        setActiveMenu(null);
       }
     };
     const closeOnOutsideClick = (event: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
         setOpen(false);
-        setApplicationMenu(false);
+        setActiveMenu(null);
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     window.addEventListener("mousedown", closeOnOutsideClick);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (open) document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("mousedown", closeOnOutsideClick);
     };
-  }, [open]);
+  }, [open, activeMenu]);
 
   return (
     <header className="site-header" ref={headerRef}>
@@ -73,19 +100,23 @@ export function SiteHeader() {
         {open ? <X size={24} /> : <List size={24} />}
       </button>
       <nav id="primary-navigation" className={open ? "nav nav-open" : "nav"} aria-label="Primary navigation">
-        {primaryNav.map((item) => item.href === "/applications" ? (
-          <div className="nav-mega" key={item.href} onPointerEnter={() => { if (canHover()) openApplicationsMenu(); }} onPointerLeave={scheduleApplicationsClose}>
+        {primaryNav.map((item) => item.href === "/applications" || item.href === "/products" ? (
+          <div className="nav-mega" key={item.href} onPointerEnter={() => { if (canHover()) openMenu(item.href === "/products" ? "products" : "applications"); }} onPointerLeave={scheduleMenuClose} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) closeMenu(); }}>
             <div className="nav-mega-trigger">
-              <Link href={item.href} aria-current={pathname.startsWith("/applications") ? "page" : undefined} className={pathname.startsWith("/applications") ? "nav-active" : ""} onFocus={openApplicationsMenu} onClick={() => { setOpen(false); setApplicationMenu(false); }}>{item.label}</Link>
-              <button type="button" aria-label={applicationMenu ? "Close applications menu" : "Open applications menu"} aria-expanded={applicationMenu} aria-controls="applications-menu" onFocus={openApplicationsMenu} onClick={() => { clearMenuCloseTimer(); setApplicationMenu((value) => !value); }}><CaretDown size={13} weight="bold" /></button>
+              <Link href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined} className={pathname.startsWith(item.href) ? "nav-active" : ""} onFocus={() => openMenu(item.href === "/products" ? "products" : "applications")} onClick={closeNavigation}>{item.label}</Link>
+              <button type="button" aria-label={`${activeMenu === item.href.slice(1) ? "Close" : "Open"} ${item.label.toLowerCase()} menu`} aria-expanded={activeMenu === item.href.slice(1)} aria-controls={`${item.href.slice(1)}-menu`} onClick={(event) => { clearMenuCloseTimer(); const menu = item.href === "/products" ? "products" : "applications"; if (canHover() && event.detail > 0) openMenu(menu); else setActiveMenu((value) => value === menu ? null : menu); }}><CaretDown size={13} weight="bold" /></button>
             </div>
-            <div id="applications-menu" className={applicationMenu ? "mega-panel mega-panel-open" : "mega-panel"} onFocus={openApplicationsMenu}>
-              <p>Choose your product route</p>
-              <div>{applications.map((application) => <Link key={application.slug} href={`/applications/${application.slug}`} onClick={() => { setOpen(false); setApplicationMenu(false); }}><span>{application.title}</span><small>{application.description}</small></Link>)}</div>
+            <div id={`${item.href.slice(1)}-menu`} className={activeMenu === item.href.slice(1) ? "mega-panel mega-panel-open" : "mega-panel"} onFocus={() => openMenu(item.href === "/products" ? "products" : "applications")}>
+              <p>{item.href === "/products" ? "Explore the collection" : "Choose your product route"}</p>
+              <div>{item.href === "/products" ? <>
+                <Link href="/products" onClick={closeNavigation}><span>All Products</span><small>Browse the published collection</small></Link>
+                {productCategories.map((category) => <Link key={category.slug} href={`/products?category=${encodeURIComponent(category.slug)}`} onClick={closeNavigation}><span>{category.name}</span><small>View products in this category</small></Link>)}
+                <Link className="mega-panel-cta" href="/request-a-quote" onClick={closeNavigation}><span>Custom Fragrance</span><small>Share your product brief with our team</small></Link>
+              </> : applications.map((application) => <Link key={application.slug} href={`/applications/${application.slug}`} onClick={closeNavigation}><span>{application.title}</span><small>{application.description}</small></Link>)}</div>
             </div>
           </div>
         ) : (
-          <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "nav-active" : ""} onClick={() => setOpen(false)}>{item.label}</Link>
+          <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "nav-active" : ""} onClick={closeNavigation}>{item.label}</Link>
         ))}
       </nav>
       <Link className="header-cart" href="/cart" aria-label={`Cart, ${cartCount} items`}><ShoppingBag size={22}/>{cartCount > 0 && <span>{cartCount}</span>}</Link>

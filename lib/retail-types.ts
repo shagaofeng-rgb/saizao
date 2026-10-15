@@ -61,7 +61,7 @@ export type RetailProduct = {
   status: "draft" | "review" | "published" | "archived";
   retail_enabled: boolean;
   is_demo: boolean;
-  content_categories?: { name: string } | null;
+  content_categories?: { name: string; slug: string } | null;
   variants: RetailVariant[];
 };
 

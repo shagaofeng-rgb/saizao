@@ -37,6 +37,8 @@ Public buttons and inputs use a `4px` radius; cards, galleries, forms and menu p
 
 Static cards remain flat. Shadows are reserved for layering, hover feedback and the login panel: mega panel `0 24px 55px rgba(71,40,25,.16)`, card hover `0 20px 42px rgba(77,41,23,.12)`, sticky contact `0 14px 30px rgba(38,24,18,.18)`, consent panel `0 16px 40px rgba(46,33,27,.2)`, and admin login `0 18px 50px rgba(68,40,27,.08)`.
 
+**Product catalog.** Treat the catalog as a factual collection surface, not a decorative product mosaic. Cards use the existing flat cream surface, divider, editorial heading and terracotta action language, and render only real published, non-demo products. Category navigation is derived from categories represented by those products; missing imagery, an empty collection and unavailable data each receive an explicit honest state rather than a fabricated placeholder product.
+
 ## Interaction
 
 - Buttons have a minimum 48 px height; mobile navigation targets are at least 44 px.
@@ -46,6 +48,8 @@ Static cards remain flat. Shadows are reserved for layering, hover feedback and 
 - Focus treatment uses a `3px` semi-transparent terracotta outline with a `3px` offset.
 - Motion is limited to the first-view/page fade, mega-panel entrance, purposeful scroll/sticky reveals, loading spinner and restrained image hover movement.
 - `prefers-reduced-motion` removes non-essential motion.
+- Product search, category selection and pagination preserve one visible URL-backed result state. The primary navigation may expose published product categories dynamically, but must always retain direct routes to **All Products** and **Custom Fragrance** when category data is absent.
+- Show purchase controls only when checkout is configured and the published, non-demo product has retail enabled with an active in-stock variant. Otherwise use one product-linked enquiry action that carries the product into the brief form; never imply that an unavailable item can be bought online.
 
 Disabled public actions use `.58` opacity, `not-allowed` cursor and no transform. Admin actions use `.52`; disabled pagination uses `.45` and suppresses hover. Loading uses the documented spinner or skeleton state, empty states remain explicit and neutral, errors use the error color without destructive visual drama, and unauthorized admin routes return the login/401 state. A dedicated disabled-input visual is not yet established and must not be invented ad hoc.
 
@@ -62,8 +66,9 @@ Disabled public actions use `.58` opacity, `not-allowed` cursor and no transform
 - Application cards become single-column on narrow phones.
 - Forms collapse from two columns to one and retain 16 px input text to avoid mobile zoom.
 - Copy must tolerate long translations and addresses without fixed heights or horizontal scrolling.
+- Product catalog cards move from three columns to two below `900px` and one below `650px`; category filters become a horizontally scrollable control row on narrow screens. Product detail split layouts also stack below `900px`, with supporting grids simplified below `650px`.
 
-The public breakpoint map is `1050 / 780 / 560 / 460 / 390 / 360px`: navigation condenses first, primary split grids stack at 780px, and the smaller breakpoints tighten gutters, card internals, forms and floating safe-area spacing. The admin breakpoint map is `1120 / 860 / 600 / 390px`: metrics and content grids reduce, the sidebar becomes a mobile drawer, and controls/pagination stack where necessary.
+The public navigation condenses at `1190px`; the product catalog/detail use `900 / 650px`, while general public sections use `1050 / 780 / 560 / 460 / 390 / 360px`. Primary split grids stack at 780px, and narrower breakpoints tighten gutters, card internals, forms and floating safe-area spacing. The admin breakpoint map is `1120 / 860 / 600 / 390px`: metrics and content grids reduce, the sidebar becomes a mobile drawer, and controls/pagination stack where necessary.
 
 ## Admin mode
 

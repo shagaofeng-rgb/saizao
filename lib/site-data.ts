@@ -15,6 +15,7 @@ export const company = {
 export const primaryNav = [
   { href: "/about", label: "About Us" },
   { href: "/capabilities", label: "Capabilities" },
+  { href: "/products", label: "Products" },
   { href: "/applications", label: "Applications" },
   { href: "/quality", label: "Sourcing & Quality" },
   { href: "/markets", label: "Markets" },

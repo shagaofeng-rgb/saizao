@@ -19,7 +19,7 @@ function optionalMeasurementAllowed() {
   return localStorage.getItem("sz_measurement_consent_v2") === "granted";
 }
 
-export function QuoteForm() {
+export function QuoteForm({ productTitle }: { productTitle?: string }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -30,6 +30,7 @@ export function QuoteForm() {
     setMessage("");
 
     const form = new FormData(formElement);
+    if (productTitle) form.set("brief", `Product of interest: ${productTitle}\n\n${String(form.get("brief") ?? "")}`);
     const url = new URL(window.location.href);
     const metaEventId = crypto.randomUUID();
     const application = String(form.get("application") ?? "");
@@ -57,6 +58,7 @@ export function QuoteForm() {
 
   return (
     <form className="quote-form" onSubmit={submit} aria-busy={status === "sending"}>
+      {productTitle && <p className="quote-product-context">Product of interest: <strong>{productTitle}</strong></p>}
       <div className="form-grid">
         <label>Name <span aria-hidden="true">*</span><input required name="name" autoComplete="name" maxLength={160} placeholder="Your name" /></label>
         <label>Work email <span aria-hidden="true">*</span><input required type="email" name="email" autoComplete="email" maxLength={254} placeholder="you@company.com" /></label>
