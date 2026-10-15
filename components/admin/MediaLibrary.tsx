@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 type Asset = { id: string; file_name: string; public_url: string; mime_type: string; byte_size: number; asset_kind: string; alt_text: string | null; created_at: string };
@@ -11,16 +11,19 @@ export function MediaLibrary({ canEdit }: { canEdit: boolean }) {
   const [items, setItems] = useState<Asset[]>([]), [total, setTotal] = useState(0), [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20);
   const [q, setQ] = useState(""), [kind, setKind] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const requestId = useRef(0);
   const [alt, setAlt] = useState<Record<string, string>>({}), [usage, setUsage] = useState<Record<string, Usage>>({});
   const load = useCallback(async () => {
+    const current = ++requestId.current;
     setState("loading");
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), q, kind });
       const response = await fetch(`/api/admin/media?${params}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || !Array.isArray(result.data)) throw new Error();
+      if (current !== requestId.current) return;
       setItems(result.data); setTotal(result.total); setAlt(Object.fromEntries(result.data.map((item: Asset) => [item.id, item.alt_text || ""]))); setState("ready");
-    } catch { setItems([]); setState("error"); }
+    } catch { if (current === requestId.current) { setItems([]); setState("error"); } }
   }, [page, pageSize, q, kind]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   async function upload(file?: File) {

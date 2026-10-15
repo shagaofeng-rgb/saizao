@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 type Category = { id: string; name: string; slug: string; description: string | null; sort_order: number; is_enabled: boolean; show_in_nav: boolean };
@@ -12,15 +12,18 @@ export function CategoryManager({ canEdit }: { canEdit: boolean }) {
   const [items, setItems] = useState<Category[]>([]), [drafts, setDrafts] = useState<Record<string, Category>>({});
   const [form, setForm] = useState(empty), [message, setMessage] = useState(""), [busy, setBusy] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const requestId = useRef(0);
   const load = useCallback(async () => {
+    const current = ++requestId.current;
     setState("loading");
     try {
       const params = new URLSearchParams({ kind, page: String(page), pageSize: String(pageSize), q: query.trim() });
       const response = await fetch(`/api/admin/categories?${params}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || !Array.isArray(result.data)) throw new Error();
+      if (current !== requestId.current) return;
       setItems(result.data); setDrafts({}); setTotal(result.total); setState("ready");
-    } catch { setItems([]); setState("error"); }
+    } catch { if (current === requestId.current) { setItems([]); setState("error"); } }
   }, [kind, page, pageSize, query]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   async function create(event: FormEvent) {

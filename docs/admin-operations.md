@@ -30,7 +30,7 @@
 
 ## 上线与回退
 
-1. 在部署代码前先执行 `supabase/migrations/20261015130644_admin_operations_completion.sql`。迁移只新增字段、表、索引和函数，不删除既有业务资料。
+1. 在部署代码前先执行 `supabase/migrations/20261015132411_admin_operations_completion.sql`。迁移只新增字段、表、索引和函数，不删除既有业务资料。
 2. 执行 `pnpm lint`、`pnpm exec tsc --noEmit` 和 `pnpm build`，再部署代码。
 3. 上线后检查分类、媒体、询盘详情、产品/资讯编辑、搜索展示和 Google 数据核验页面。仅用既有真实记录核验，不创建虚构业务数据。
 4. 若新版代码出现问题，先回退 Vercel 部署到上一个稳定版本。新增数据库结构保持不动即可兼容旧版代码；不要直接删除新表或字段，以免丢失上线后产生的数据。
