@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin-session";
+import { canManageStaff, getAdminSession } from "@/lib/admin-session";
 import { rpc } from "@/lib/supabase-server";
 
 export async function GET() {
-  if (!(await getAdminSession())) return NextResponse.json({ message: "请先登录。" }, { status: 401 });
+  const session = await getAdminSession();
+  if (!session || !canManageStaff(session.role)) return NextResponse.json({ message: "无权查看负责人。" }, { status: 403 });
   try {
     const staff = await rpc<{ id: string; display_name: string; role: string; is_active: boolean }[]>("admin_list_staff", {});
     return NextResponse.json({ data: staff.filter((item) => item.is_active && ["super_admin", "admin", "sales"].includes(item.role)).map((item) => ({ id: item.id, name: item.display_name })) });
