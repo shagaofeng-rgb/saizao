@@ -51,6 +51,7 @@ export type RetailProduct = {
   summary: string | null;
   content: string;
   application: string | null;
+  category_id: string | null;
   cover_url: string | null;
   hero_url: string | null;
   gallery: ProductImage[];

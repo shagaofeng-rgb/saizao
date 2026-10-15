@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageContent, getAdminSession } from "@/lib/admin-session";
+import { canManageContent, canPublishContent, getAdminSession } from "@/lib/admin-session";
 import { getRetailProductForAdmin } from "@/lib/retail-data";
 import { rest, rpc } from "@/lib/supabase-server";
 import { isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
@@ -18,7 +18,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   if (!uuid.test(id)) return NextResponse.json({ message: "Invalid product" }, { status: 400 });
   const product = await getRetailProductForAdmin(id);
-  return product ? NextResponse.json({ data: product }) : NextResponse.json({ message: "Not found" }, { status: 404 });
+  if (!product) return NextResponse.json({ message: "Not found" }, { status: 404 });
+  const revisions = await rest<{ id: string; created_at: string }[]>(`content_revisions?select=id,created_at&entity_type=eq.products&entity_id=eq.${id}&order=created_at.desc&limit=10`).catch(() => ({ data: [] as { id: string; created_at: string }[] }));
+  return NextResponse.json({ data: product, revisions: revisions.data });
 }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession(); const { id } = await params;
@@ -50,16 +52,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const cleaned = variants.map((v, sort_order) => ({ id: uuid.test(String(v.id ?? "")) ? String(v.id) : undefined, product_id: id, sku: text(v.sku, 80).toUpperCase(), label: text(v.label, 60), price_minor: Number(v.price_minor), compare_at_minor: v.compare_at_minor ? Number(v.compare_at_minor) : null, currency: "USD", stock_quantity: Number(v.stock_quantity), weight_grams: Number(v.weight_grams) || 0, image_url: safeUrl(v.image_url) || null, is_active: Boolean(v.is_active), sort_order }));
   if (cleaned.some((v) => !v.sku || !v.label || !Number.isInteger(v.price_minor) || v.price_minor < 0 || !Number.isInteger(v.stock_quantity) || v.stock_quantity < 0 || !Number.isInteger(v.weight_grams) || v.weight_grams < 0)) return NextResponse.json({ message: "Check variant prices, stock and SKU" }, { status: 400 });
   const demo = existing.is_demo || Boolean(body.is_demo);
-  if (body.status === "published" && demo) return NextResponse.json({ message: "Demo products cannot be published. Create a real product with verified information." }, { status: 400 });
   const status = ["draft", "review", "published", "archived"].includes(body.status) ? body.status : existing.status;
-  const payload = { title, slug, subtitle: text(body.subtitle, 240) || null, badge: text(body.badge, 80) || null, summary: text(body.summary, 600) || null, content: text(body.content, 30000), cover_url: safeUrl(body.cover_url) || null, hero_url: safeUrl(body.hero_url) || null, gallery, detail, retail_enabled: Boolean(body.retail_enabled), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, status, published_at: status === "published" ? new Date().toISOString() : null, updated_at: new Date().toISOString(), updated_by: session.accountId };
+  if ((status === "published" || existing.status === "published") && !canPublishContent(session.role)) return NextResponse.json({ message: "只有管理员可以发布或修改已发布商品。" }, { status: 403 });
+  if (status === "published" && demo) return NextResponse.json({ message: "设计示例不能发布，请新建真实商品。" }, { status: 400 });
+  const category_id = uuid.test(String(body.category_id || "")) ? String(body.category_id) : null;
+  const cover_url = safeUrl(body.cover_url) || null;
+  const content = text(body.content, 30000);
+  const summary = text(body.summary, 600) || null;
+  if (status === "published") {
+    if (!category_id || !cover_url || !summary || !content) return NextResponse.json({ message: "发布前请补齐分类、主图、简介和正文。" }, { status: 400 });
+    const category = await rest<{ id: string }[]>(`content_categories?select=id&id=eq.${category_id}&content_kind=eq.product&is_enabled=eq.true&deleted_at=is.null&limit=1`).catch(() => null);
+    if (!category?.data[0]) return NextResponse.json({ message: "请选择已启用的产品分类。" }, { status: 400 });
+    if (Boolean(body.retail_enabled) && !cleaned.some((variant) => variant.is_active && variant.price_minor > 0)) return NextResponse.json({ message: "开启零售前请配置至少一个有售价的上架规格。" }, { status: 400 });
+  }
+  const payload = { title, slug, category_id, subtitle: text(body.subtitle, 240) || null, badge: text(body.badge, 80) || null, summary, content, cover_url, hero_url: safeUrl(body.hero_url) || null, gallery, detail, retail_enabled: Boolean(body.retail_enabled), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, status, updated_by: session.accountId };
   try {
-    const saved = await rest<Record<string, unknown>[]>(`products?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
-    for (const variant of cleaned) {
-      if (variant.id) await rest(`retail_variants?id=eq.${variant.id}&product_id=eq.${id}`, { method: "PATCH", body: JSON.stringify(variant) });
-      else await rest("retail_variants", { method: "POST", body: JSON.stringify(variant) });
-    }
+    const saved = await rpc<Record<string, unknown>>("admin_save_retail_product", { p_product_id: id, p_payload: payload, p_variants: cleaned });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "retail_product_updated", p_entity_type: "products", p_entity_id: id, p_metadata: { status, variantCount: cleaned.length } }).catch(() => undefined);
-    return NextResponse.json({ ok: true, data: saved.data[0] });
-  } catch { return NextResponse.json({ message: "Save failed. Check SKU uniqueness and stock reservations." }, { status: 400 }); }
+    return NextResponse.json({ ok: true, data: saved });
+  } catch { return NextResponse.json({ message: "保存失败，请检查 SKU 是否重复，以及库存是否低于已预留数量。" }, { status: 400 }); }
 }

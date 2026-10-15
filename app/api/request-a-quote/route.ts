@@ -3,42 +3,12 @@ import { company } from "@/lib/site-data";
 import { cleanText, fingerprint, isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 import { isSupabaseConfigured, recordLeadNotification, submitLead } from "@/lib/supabase-server";
 import { metaCookie, sendMetaLeadEvent } from "@/lib/meta-conversions";
+import { notifyTeam } from "@/lib/lead-notifications";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function field(form: FormData, key: string, max: number) {
   return cleanText(form.get(key), max);
-}
-
-async function notifyTeam(lead: Record<string, string | null>) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.ENQUIRY_NOTIFICATION_TO;
-  const from = process.env.ENQUIRY_NOTIFICATION_FROM;
-  if (!apiKey || !to || !from) return "not_configured" as const;
-
-  const lines = [
-    `Name: ${lead.name}`,
-    `Company: ${lead.company}`,
-    `Email: ${lead.email}`,
-    `Phone: ${lead.phone || "Not supplied"}`,
-    `Country / region: ${lead.country_name || lead.country_code || "Not supplied"}`,
-    `Application: ${lead.application || "Not supplied"}`,
-    `Page: ${lead.page_path || "Unknown"}`,
-    "",
-    "Project brief:",
-    lead.brief || "",
-  ];
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject: `New Sai Zhao enquiry — ${lead.company}`, text: lines.join("\n"), reply_to: lead.email }),
-      signal: AbortSignal.timeout(8_000),
-    });
-    return response.ok ? "sent" as const : "failed" as const;
-  } catch {
-    return "failed" as const;
-  }
 }
 
 export async function POST(request: Request) {

@@ -40,4 +40,7 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 export async function hasAdminSession() { return Boolean(await getAdminSession()); }
 export function canManageStaff(role: AdminRole) { return role === "super_admin" || role === "admin"; }
 export function canManageContent(role: AdminRole) { return role === "super_admin" || role === "admin" || role === "content_editor"; }
+export function canPublishContent(role: AdminRole) { return role === "super_admin" || role === "admin"; }
+export function canManageLeads(role: AdminRole) { return role === "super_admin" || role === "admin" || role === "sales"; }
+export function canExportLeads(role: AdminRole) { return role === "super_admin" || role === "admin"; }
 export const adminCookie = { name:cookieName,maxAge:maxAgeSeconds,httpOnly:true,sameSite:"strict" as const,secure:process.env.NODE_ENV==="production",path:"/" };

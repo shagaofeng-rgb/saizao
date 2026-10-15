@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { canManageContent, getAdminSession } from "@/lib/admin-session";
+import { canManageContent, canPublishContent, getAdminSession } from "@/lib/admin-session";
 import { rest, rpc } from "@/lib/supabase-server";
 import { isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 
 type Kind = "products" | "articles";
 function slug(value: unknown) { return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,120); }
+function mediaUrl(value: unknown) { const raw = String(value ?? "").trim().slice(0,2000); if (!raw) return null; try { const url = new URL(raw); return url.protocol === "https:" && url.hostname === "pohsefmowgthjskmbkyg.supabase.co" && url.pathname.startsWith("/storage/v1/object/public/website-media/") ? raw : null; } catch { return null; } }
 async function tableFrom(params: Promise<{kind:string}>) { const kind=(await params).kind; return (kind==="products"||kind==="articles") ? kind as Kind : null; }
-async function categoryId(name: unknown, contentKind: "product"|"article") {
-  const label=String(name??"").trim().slice(0,100); if(!label) return null;
-  const key=slug(label); if(!key) return null;
-  const found=await rest<{id:string}[]>(`content_categories?select=id&content_kind=eq.${contentKind}&slug=eq.${key}&limit=1`);
-  if(found.data[0]) return found.data[0].id;
-  const created=await rest<{id:string}[]>(`content_categories?on_conflict=content_kind,slug`,{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=representation"},body:JSON.stringify({content_kind:contentKind,name:label,slug:key})});
-  return created.data[0]?.id ?? null;
+async function categoryId(value: unknown, contentKind: "product"|"article") {
+  const id = String(value || "");
+  if (!id) return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  const found = await rest<{id:string}[]>(`content_categories?select=id&id=eq.${id}&content_kind=eq.${contentKind}&is_enabled=eq.true&deleted_at=is.null&limit=1`);
+  return found.data[0]?.id ?? null;
 }
 export async function GET(request:Request,{params}:{params:Promise<{kind:string}>}) {
   const session=await getAdminSession(); const table=await tableFrom(params);
@@ -39,9 +39,12 @@ export async function POST(request:Request,{params}:{params:Promise<{kind:string
   const body=await request.json().catch(()=>({})), title=String(body.title??"").trim().slice(0,180), entrySlug=slug(body.slug||title);
   if(title.length<2||!entrySlug) return NextResponse.json({message:"请填写标题与有效链接标识。"},{status:400});
   const status=["draft","review","published","archived"].includes(body.status)?body.status:"draft";
-  const category_id=await categoryId(body.categoryName,table==="products"?"product":"article");
-  const common={title,slug:entrySlug,category_id,content:String(body.content??"").slice(0,30000),cover_url:String(body.coverUrl??"").slice(0,2000)||null,attachment_url:String(body.attachmentUrl??"").slice(0,2000)||null,seo_title:String(body.seoTitle??"").slice(0,180)||null,seo_description:String(body.seoDescription??"").slice(0,320)||null,status,published_at:status==="published"?new Date().toISOString():null,created_by:session.accountId,updated_by:session.accountId};
+  if (status === "published" && (!canPublishContent(session.role) || table === "products")) return NextResponse.json({ message: table === "products" ? "请先保存商品，再到详情编辑页完成资料和发布检查。" : "只有管理员可以发布内容。" }, { status: 403 });
+  const category_id=await categoryId(body.categoryId,table==="products"?"product":"article");
+  if (body.categoryId && !category_id) return NextResponse.json({ message: "请选择已启用的分类。" }, { status: 400 });
+  const common={title,slug:entrySlug,category_id,content:String(body.content??"").slice(0,30000),cover_url:mediaUrl(body.coverUrl),attachment_url:mediaUrl(body.attachmentUrl),seo_title:String(body.seoTitle??"").slice(0,180)||null,seo_description:String(body.seoDescription??"").slice(0,320)||null,status,published_at:status==="published"?new Date().toISOString():null,created_by:session.accountId,updated_by:session.accountId};
   const payload=table==="products"?{...common,summary:String(body.summary??"").slice(0,600)||null,application:String(body.application??"").slice(0,160)||null}:{...common,excerpt:String(body.summary??"").slice(0,600)||null,article_type:["news","faq","market","insight"].includes(body.articleType)?body.articleType:"news"};
+  if (status === "published" && (!payload.content.trim() || !payload.cover_url || !category_id)) return NextResponse.json({ message: "发布前请补齐正文、封面和分类。" }, { status: 400 });
   const saved=await rest<Record<string,unknown>[]>(table,{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)}).catch(()=>null);
   if(!saved) return NextResponse.json({message:"保存失败，链接标识可能已存在。"},{status:400});
   await rpc("admin_log_audit",{p_actor_id:session.accountId,p_action:"content_created",p_entity_type:table,p_entity_id:String(saved.data[0]?.id??""),p_metadata:{status}}).catch(()=>undefined);
@@ -54,10 +57,12 @@ export async function PATCH(request:Request,{params}:{params:Promise<{kind:strin
   const body=await request.json().catch(()=>({})); if(typeof body.id!=="string") return NextResponse.json({message:"缺少内容编号。"},{status:400});
   const status=["draft","review","published","archived"].includes(body.status)?body.status:null;
   if(!status) return NextResponse.json({message:"无效状态。"},{status:400});
-  if(table === "products" && status === "published") {
-    const current = await rest<{is_demo:boolean}[]>(`products?select=is_demo&id=eq.${encodeURIComponent(body.id)}&limit=1`).catch(()=>null);
-    if(current?.data[0]?.is_demo) return NextResponse.json({message:"设计示例不能直接发布，请新建真实商品。"},{status:400});
-  }
+  if (table === "products" && status === "published") return NextResponse.json({ message: "请进入产品详情完成发布检查。" }, { status: 400 });
+  const current = await rest<{status:string;is_demo?:boolean;cover_url?:string|null;category_id?:string|null;content?:string}[]>(`${table}?select=status${table === "products" ? ",is_demo" : ""},cover_url,category_id,content&id=eq.${encodeURIComponent(body.id)}&limit=1`).catch(() => null);
+  if (!current?.data[0]) return NextResponse.json({ message: "内容不存在。" }, { status: 404 });
+  if ((status === "published" || current.data[0].status === "published") && !canPublishContent(session.role)) return NextResponse.json({ message: "只有管理员可以发布或下架内容。" }, { status: 403 });
+  if (status === "published" && current.data[0].is_demo) return NextResponse.json({ message: "设计示例不能直接发布，请新建真实商品。" }, { status: 400 });
+  if (status === "published" && (!current.data[0].cover_url || !current.data[0].category_id || !current.data[0].content?.trim())) return NextResponse.json({ message: "发布前请补齐正文、封面和分类。" }, { status: 400 });
   const saved=await rest<Record<string,unknown>[]>(`${table}?id=eq.${encodeURIComponent(body.id)}`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({status,published_at:status==="published"?new Date().toISOString():null,updated_at:new Date().toISOString(),updated_by:session.accountId})}).catch(()=>null);
   if(!saved?.data[0]) return NextResponse.json({message:"更新失败。"},{status:400});
   await rpc("admin_log_audit",{p_actor_id:session.accountId,p_action:"content_status_changed",p_entity_type:table,p_entity_id:body.id,p_metadata:{status}}).catch(()=>undefined);

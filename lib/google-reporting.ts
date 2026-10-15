@@ -49,6 +49,7 @@ async function accessToken(account: ServiceAccount) {
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
   const body = await response.json().catch(() => null) as { access_token?: string } | null;
   if (!response.ok || !body?.access_token) throw new Error("Google token unavailable");
@@ -60,6 +61,7 @@ async function googleJson<T>(url: string, token: string, init: RequestInit = {})
     ...init,
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers },
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) {
     const error = new Error("Google API unavailable") as Error & { status?: number };
