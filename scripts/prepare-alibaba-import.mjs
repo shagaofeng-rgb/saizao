@@ -3,13 +3,15 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { mapSource } from "../lib/alibaba-source.mjs";
 
-const { values } = parseArgs({ options: { "source-dir": { type: "string" } } });
+const { values } = parseArgs({ options: { "source-dir": { type: "string" }, limit: { type: "string" } } });
 if (!values["source-dir"]) throw new Error("Provide --source-dir");
 const directory = path.resolve(values["source-dir"]);
 const catalog = JSON.parse(await fs.readFile(path.join(directory, "catalog.json"), "utf8"));
 const records = JSON.parse(await fs.readFile(path.join(directory, "details.json"), "utf8"));
+const limit = values.limit === undefined ? records.length : Number(values.limit);
+if (!Number.isInteger(limit) || limit < 1 || limit > records.length) throw new Error("Invalid verified-product limit");
 const index = new Map(catalog.products.map((product) => [product.id, product]));
-const prepared = { format: "saizhao-alibaba-v1", capturedAt: catalog.capturedAt, sourceTotal: index.size, categories: catalog.categories, products: records.map((record) => {
+const prepared = { format: "saizhao-alibaba-v1", capturedAt: catalog.capturedAt, sourceTotal: index.size, categories: catalog.categories, products: records.slice(0, limit).map((record) => {
   const source = index.get(record.id);
   if (!source) throw new Error(`Product ${record.id} is not in the catalog`);
   const categorySourceId = source.categoryIds.find((id) => catalog.categories.find((category) => category.id === id)?.parentId !== "products") || source.categoryIds[0];
