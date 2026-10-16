@@ -478,6 +478,13 @@ input::placeholder, textarea::placeholder { color: #75645b; opacity: 1; }
 .nav a { min-height: 44px; display: inline-flex; align-items: center; }
 .nav-active { color: var(--clay-dark); }
 .mega-panel { border-radius: 8px; background: var(--cream); }
+#products-menu{width:min(760px,82vw)}
+#products-menu>div{max-height:min(65vh,560px);overflow-y:auto;overscroll-behavior:contain;padding-right:8px}
+.mega-product-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 22px}
+.mega-product-group{min-width:0}
+.mega-product-children{padding-left:14px;border-left:1px solid var(--line)}
+.mega-product-children a{font-size:12px;line-height:1.4;min-height:36px}
+@media(max-width:1190px){#products-menu{width:100%}#products-menu>div{max-height:none;overflow:visible;padding-right:0}.mega-product-groups{grid-template-columns:1fr;gap:12px}.mega-product-children a{min-height:44px}}
 .mega-panel span { font-family: var(--font-display), serif; }
 .button { min-height: 48px; border-radius: 4px; padding-inline: 22px; }
 .button:hover, .button:focus-visible { transform: translateY(-1px); }

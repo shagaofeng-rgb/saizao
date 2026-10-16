@@ -21,7 +21,7 @@ export async function GET(request:Request,{params}:{params:Promise<{kind:string}
   const term=search.get("q")?.trim(), status=search.get("status")?.trim(), from=search.get("from")?.trim(), to=search.get("to")?.trim();
   const validDate=(value:string|undefined)=>Boolean(value&&Number.isFinite(Date.parse(value)));
   const filters=[
-    status&&["draft","review","published","archived"].includes(status)?"status=eq."+status:null,
+    status&&["draft","review","published","archived"].includes(status)?"status=eq."+status:table==="products"?"status=neq.archived":null,
     term?"title=ilike.*"+encodeURIComponent(term.replace(/[,*()]/g,""))+"*":null,
     validDate(from)?"updated_at=gte."+encodeURIComponent(new Date(from as string).toISOString()):null,
     validDate(to)?"updated_at=lte."+encodeURIComponent(new Date(to as string).toISOString()):null
@@ -31,6 +31,23 @@ export async function GET(request:Request,{params}:{params:Promise<{kind:string}
   if(!response) return NextResponse.json({message:"无法读取内容。"},{status:503});
   const range=response.response.headers.get("content-range")??"0-0/0", total=Number(range.split("/")[1]??0);
   return NextResponse.json({data:response.data,total,page,pageSize});
+}
+export async function DELETE(request: Request, { params }: { params: Promise<{ kind: string }> }) {
+  const session = await getAdminSession(); const table = await tableFrom(params);
+  if (!session || !table || !canManageContent(session.role)) return NextResponse.json({ message: "无权删除内容。" }, { status: 403 });
+  if (!isSameOrigin(request) || requestBodyTooLarge(request, 3000)) return NextResponse.json({ message: "请求校验失败。" }, { status: 400 });
+  const body = await request.json().catch(() => null);
+  if (!body || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(body.id || ""))) return NextResponse.json({ message: "内容编号无效。" }, { status: 400 });
+  try {
+    const current = await rest<{ id: string; status: string }[]>(`${table}?select=id,status&id=eq.${body.id}&limit=1`);
+    if (!current.data[0]) return NextResponse.json({ message: "内容不存在。" }, { status: 404 });
+    if (current.data[0].status === "published" && !canPublishContent(session.role)) return NextResponse.json({ message: "只有管理员可以删除已发布内容。" }, { status: 403 });
+    const payload = { status: "archived", published_at: null, updated_at: new Date().toISOString(), updated_by: session.accountId, ...(table === "products" ? { retail_enabled: false } : {}) };
+    const saved = await rest<{ id: string }[]>(`${table}?id=eq.${body.id}&status=eq.${current.data[0].status}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
+    if (!saved.data[0]) return NextResponse.json({ message: "内容已被修改，请刷新后重试。" }, { status: 409 });
+    await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "content_archived", p_entity_type: table, p_entity_id: body.id, p_metadata: { previousStatus: current.data[0].status } }).catch(() => undefined);
+    return NextResponse.json({ ok: true });
+  } catch { return NextResponse.json({ message: "删除失败，请稍后重试。" }, { status: 503 }); }
 }
 export async function POST(request:Request,{params}:{params:Promise<{kind:string}>}) {
   const session=await getAdminSession(); const table=await tableFrom(params);

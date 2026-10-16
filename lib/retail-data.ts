@@ -4,7 +4,7 @@ import { normalizeDetail, type RetailProduct, type RetailVariant } from "@/lib/r
 
 const productSelect = "id,title,slug,subtitle,badge,summary,content,application,category_id,cover_url,hero_url,gallery,detail,attachment_url,seo_title,seo_description,status,retail_enabled,is_demo,content_categories(name,slug,is_enabled,show_in_nav,deleted_at)";
 
-export type ProductCategory = { name: string; slug: string; is_enabled?: boolean; show_in_nav?: boolean; deleted_at?: string | null };
+export type ProductCategory = { id: string; name: string; slug: string; parent_id: string | null; sort_order: number; is_enabled?: boolean; show_in_nav?: boolean; deleted_at?: string | null };
 export type CatalogResult = { items: RetailProduct[]; total: number; page: number; unavailable: boolean };
 const catalogPageSize = 12;
 
@@ -36,7 +36,7 @@ export async function getRetailProductForAdmin(id: string) {
   if (!/^[0-9a-f-]{36}$/.test(id) || !isSupabaseConfigured()) return null;
   try {
     const response = await rest<ProductRow[]>(
-      `products?select=${productSelect}&id=eq.${id}&limit=1`,
+      `products?select=${productSelect},source_provider,source_id,source_url,source_synced_at&id=eq.${id}&limit=1`,
     );
     return response.data[0] ? hydrateProduct(response.data[0]) : null;
   } catch { return null; }
@@ -57,18 +57,15 @@ export async function getRelatedRetailProducts(slugs: string[], excludeId: strin
 export async function getPublishedProductCategories(): Promise<ProductCategory[]> {
   if (!isSupabaseConfigured()) return [];
   try {
-    const categories = new Map<string, ProductCategory>();
+    const categories: ProductCategory[] = [];
     for (let offset = 0; ; offset += 500) {
-      const response = await rest<{ content_categories: ProductCategory | null }[]>(
-        `products?select=content_categories(name,slug,is_enabled,show_in_nav,deleted_at)&status=eq.published&is_demo=eq.false&category_id=not.is.null&order=published_at.desc&limit=500&offset=${offset}`,
+      const response = await rest<ProductCategory[]>(
+        `content_categories?select=id,name,slug,parent_id,sort_order&content_kind=eq.product&is_enabled=eq.true&show_in_nav=eq.true&deleted_at=is.null&order=sort_order.asc,name.asc&limit=500&offset=${offset}`,
       );
-      for (const row of response.data) {
-        const category = row.content_categories;
-        if (category?.slug && category.name && category.is_enabled && category.show_in_nav && !category.deleted_at) categories.set(category.slug, category);
-      }
+      categories.push(...response.data);
       if (response.data.length < 500) break;
     }
-    return [...categories.values()].sort((a, b) => a.name.localeCompare(b.name, "en"));
+    return categories.filter((category) => !category.parent_id).flatMap((parent) => [parent, ...categories.filter((category) => category.parent_id === parent.id)]);
   } catch { return []; }
 }
 
@@ -82,7 +79,8 @@ export async function getRetailCatalogPage({ query = "", category = "", page = 1
       if (!/^[a-z0-9-]{1,120}$/.test(categorySlug)) return { items: [], total: 0, page: 1, unavailable: false };
       const found = await rest<{ id: string }[]>(`content_categories?select=id&content_kind=eq.product&slug=eq.${categorySlug}&is_enabled=eq.true&deleted_at=is.null&limit=1`);
       if (!found.data[0]) return { items: [], total: 0, page: 1, unavailable: false };
-      categoryFilter = `&category_id=eq.${found.data[0].id}`;
+      const children = await rest<{ id: string }[]>(`content_categories?select=id&content_kind=eq.product&parent_id=eq.${found.data[0].id}&is_enabled=eq.true&deleted_at=is.null&limit=1000`);
+      categoryFilter = `&category_id=in.(${[found.data[0].id, ...children.data.map((child) => child.id)].join(",")})`;
     }
     const term = query.trim().replace(/[,%()*]/g, "").slice(0, 80);
     const searchFilter = term ? `&title=ilike.*${encodeURIComponent(term)}*` : "";

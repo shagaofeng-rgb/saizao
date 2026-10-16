@@ -11,7 +11,7 @@ import { readCart } from "@/lib/retail-cart";
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<"products" | "applications" | null>(null);
-  const [productCategories, setProductCategories] = useState<{ name: string; slug: string }[]>([]);
+  const [productCategories, setProductCategories] = useState<{ id: string; name: string; slug: string; parent_id: string | null }[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
@@ -110,7 +110,10 @@ export function SiteHeader() {
               <p>{item.href === "/products" ? "Explore the collection" : "Choose your product route"}</p>
               <div>{item.href === "/products" ? <>
                 <Link href="/products" onClick={closeNavigation}><span>All Products</span><small>Browse the published collection</small></Link>
-                {productCategories.map((category) => <Link key={category.slug} href={`/products?category=${encodeURIComponent(category.slug)}`} onClick={closeNavigation}><span>{category.name}</span><small>View products in this category</small></Link>)}
+                <div className="mega-product-groups">{productCategories.filter((category) => !category.parent_id).map((category) => <div className="mega-product-group" key={category.slug}>
+                  <Link href={`/products?category=${encodeURIComponent(category.slug)}`} onClick={closeNavigation}><span>{category.name}</span></Link>
+                  {productCategories.some((child) => child.parent_id === category.id) && <div className="mega-product-children">{productCategories.filter((child) => child.parent_id === category.id).map((child) => <Link key={child.slug} href={`/products?category=${encodeURIComponent(child.slug)}`} onClick={closeNavigation}>{child.name}</Link>)}</div>}
+                </div>)}</div>
                 <Link className="mega-panel-cta" href="/request-a-quote" onClick={closeNavigation}><span>Custom Fragrance</span><small>Share your product brief with our team</small></Link>
               </> : applications.map((application) => <Link key={application.slug} href={`/applications/${application.slug}`} onClick={closeNavigation}><span>{application.title}</span><small>{application.description}</small></Link>)}</div>
             </div>

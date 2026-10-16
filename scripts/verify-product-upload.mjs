@@ -13,6 +13,7 @@ const productId = "33333333-3333-4333-8333-333333333333";
 const secret = "isolated-product-upload-verification-only-secret";
 const writes = [];
 const syncRuns = [];
+let verificationRole = "admin";
 let appOutput = "";
 const upstream = createServer(async (request, response) => {
   const chunks = [];
@@ -21,11 +22,16 @@ const upstream = createServer(async (request, response) => {
   const body = raw ? JSON.parse(raw) : null;
   const url = new URL(request.url, "http://local.test");
   response.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/rest/v1/rpc/admin_get_session_account") return response.end(JSON.stringify([{ is_active: true, session_version: 1, role: "admin", email: "verification@example.test", display_name: "Local verification", force_password_reset: false }]));
+  if (url.pathname === "/rest/v1/rpc/admin_get_session_account") return response.end(JSON.stringify([{ is_active: true, session_version: 1, role: verificationRole, email: "verification@example.test", display_name: "Local verification", force_password_reset: false }]));
   if (request.method === "GET" && url.pathname === "/rest/v1/content_categories") return response.end(JSON.stringify([{ id: categoryId }]));
+  if (request.method === "GET" && url.pathname === "/rest/v1/articles") return response.end("[]");
   if (request.method === "POST" && url.pathname === "/rest/v1/products") {
     if (body.slug === "duplicate-product") { response.statusCode = 409; return response.end(JSON.stringify({ message: "unique constraint" })); }
     writes.push(body); return response.end(JSON.stringify([{ id: productId, ...body }]));
+  }
+  if (request.method === "GET" && url.pathname === "/rest/v1/products") return response.end(JSON.stringify(url.searchParams.has("source_provider") ? [] : writes.map((item) => ({ id: productId, ...item }))));
+  if (request.method === "PATCH" && url.pathname === "/rest/v1/products") {
+    Object.assign(writes[0], body); return response.end(JSON.stringify([{ id: productId, ...writes[0] }]));
   }
   if (request.method === "POST" && url.pathname === "/rest/v1/integration_sync_runs") {
     const run = { id: "44444444-4444-4444-8444-444444444444", ...body };
@@ -80,12 +86,32 @@ try {
   assert.equal(writes[0].retail_enabled, false); assert.equal(writes[0].created_by, accountId);
   assert.equal((await post({ ...draft, slug: "duplicate-product" })).status, 400);
   assert.equal(writes.length, 1, "duplicate slugs must not create a second product");
+  const adminRequest = (route, method, body, headers = {}) => fetch(`${origin}${route}`, { method, headers: { "Content-Type": "application/json", Origin: requestOrigin, Cookie: cookie, ...headers }, body: JSON.stringify(body) });
+  assert.equal((await adminRequest("/api/admin/content/products", "DELETE", { id: productId }, { Origin: "https://other.example.test" })).status, 400);
+  assert.equal((await adminRequest("/api/admin/content/products", "DELETE", null)).status, 400);
+  writes[0].status = "published"; verificationRole = "editor";
+  assert.equal((await adminRequest("/api/admin/content/products", "DELETE", { id: productId })).status, 403, "editors cannot delete published products");
+  assert.equal(writes[0].status, "published"); verificationRole = "admin";
+  assert.equal((await adminRequest("/api/admin/content/products", "DELETE", { id: productId })).status, 200);
+  assert.equal(writes[0].status, "archived"); assert.equal(writes[0].retail_enabled, false); assert.equal(writes[0].published_at, null);
+  assert.equal((await adminRequest("/api/admin/content/products", "PATCH", { id: productId, status: "draft" })).status, 200);
+  assert.equal(writes[0].status, "draft", "deleted products must be recoverable as drafts");
+  assert.equal((await adminRequest("/api/admin/categories", "POST", null)).status, 400);
+  assert.equal((await adminRequest("/api/admin/categories", "PATCH", { id: categoryId, name: "Category", slug: "category", sort_order: 0, parent_id: categoryId })).status, 400, "self-parent cycles must be refused");
+  assert.equal((await adminRequest("/api/admin/categories", "DELETE", { id: categoryId })).status, 409, "referenced categories must be protected");
+  const imported = { sourceId: "1601104937745", sourceUrl: "https://www.alibaba.com/product-detail/Brand-Duplicated-L-Eau-Papier-Bulk_1601104937745.html", categorySourceId: "902415060", sourceSnapshot: { id: "1601104937745", attributes: [{ label: "Product Name", value: "Verification only" }] }, capturedAt: new Date().toISOString(), data: { title: "Verification only", slug: "verification-only", summary: "Verified source description", content: "Verified source description", detail: {}, gallery: [{ url: "https://other.example.test/image.jpg", alt: "" }] } };
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported }, { Cookie: "" })).status, 403);
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported }, { Origin: "https://other.example.test" })).status, 400);
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported })).status, 400, "arbitrary image hosts must not be fetched");
+  verificationRole = "editor";
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported, publish: true })).status, 403);
+  verificationRole = "admin";
   const day = new Date().toISOString().slice(0, 10);
   const syncResponse = await fetch(`${origin}/api/admin/sync`, { method: "POST", headers: { "Content-Type": "application/json", Origin: requestOrigin, Cookie: cookie }, body: JSON.stringify({ from: day, to: day }) });
   assert.equal(syncResponse.status, 200, "successful empty 204 writes must not become a false server error");
   assert.equal((await syncResponse.json()).status, "failed", "unconfigured integrations must retain their real state");
   assert.equal(syncRuns.length, 1); assert.ok(syncRuns[0].finished_at);
-  console.log("Product creation and empty-write responses verified: authentication, validation, media persistence, draft status, duplicate handling and sync completion. Production data was not touched.");
+  console.log("Product creation, recoverable deletion, role checks, category protection, import source validation and empty-write responses verified. Production data was not touched.");
 } finally {
   if (app.exitCode === null) { const stopped = once(app, "exit"); app.kill("SIGTERM"); await stopped; }
   await new Promise((resolve) => upstream.close(resolve));

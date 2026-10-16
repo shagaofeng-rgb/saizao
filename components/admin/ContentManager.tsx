@@ -32,6 +32,7 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<Item | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", status: "draft", coverUrl: "", attachmentUrl: "" });
 
@@ -96,10 +97,22 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
     finally { setBusy(false); }
   }
 
+  async function removeItem() {
+    if (!deleteItem || busy) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(`/api/admin/content/${kind}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteItem.id }) });
+      const result = await response.json();
+      setMessage(response.ok ? `${label}已删除，可在“已归档”中恢复为草稿。` : result.message || "删除失败，请重试。");
+      if (response.ok) { setDeleteItem(null); if (items.length === 1 && page > 1) setPage(page - 1); else void load(); }
+    } catch { setMessage("删除失败，请重试。"); }
+    finally { setBusy(false); }
+  }
+
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
   return <AdminShell><section id="main-content" className="admin-content admin-content-wide">
-    <header className="admin-header"><div><h1>{label}管理</h1><p className="admin-subtitle">{kind === "products" ? "管理产品资料、图片、零售规格和发布状态。" : "维护官网公开内容"}</p></div>{kind === "products" && canEdit && <Link className="admin-primary" href="/admin/products/new"><Plus aria-hidden="true" />上传产品</Link>}</header>
+    <header className="admin-header"><div><h1>{label}管理</h1><p className="admin-subtitle">{kind === "products" ? "管理产品资料、图片、零售规格和发布状态。" : "维护官网公开内容"}</p></div>{kind === "products" && canEdit && <div className="admin-row-actions"><Link className="admin-row-action" href="/admin/products/import">批量导入</Link><Link className="admin-primary" href="/admin/products/new"><Plus aria-hidden="true" />上传产品</Link></div>}</header>
     <section className={inlineCreate ? "admin-split" : kind === "products" ? "admin-product-list" : "admin-readonly-list"}>
       {inlineCreate && <form className="admin-editor" onSubmit={submit}>
         <h2>新建{label}</h2>
@@ -124,7 +137,20 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
         <div className="admin-panel-heading"><h2>{label}列表</h2><label>每页<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10 条</option><option value={20}>20 条</option><option value={50}>50 条</option><option value={100}>100 条</option></select></label></div>
         <div className="admin-list-filters"><label>搜索标题<input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label><label>发布状态<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">全部状态</option>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></label></div>
         {kind === "products" && message && <p role="status" className="admin-feedback">{message}</p>}
-        <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>{readState === "loading" ? <tr><td colSpan={5} className="admin-empty">正在读取{label}…</td></tr> : readState === "error" ? <tr><td colSpan={5} className="admin-empty" role="alert">无法读取{label}，请重试。</td></tr> : items.length ? items.map((item) => <tr key={item.id}><td><b>{item.title}</b>{item.is_demo && <span className="admin-tag">设计示例</span>}<small>/{kind === "products" ? "products" : "news"}/{item.slug}</small></td><td>{item.content_categories?.name ?? "—"}</td><td><span className="admin-tag">{statusLabels[item.status] ?? item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString("zh-CN")}</td><td>{canEdit && (canPublish || item.status !== "published") ? <div className="admin-row-actions"><Link className="admin-row-action" href={kind === "products" ? `/admin/products/${item.id}` : `/admin/news/${item.id}`}>编辑内容</Link><select value={item.status} aria-label={`${item.title}的发布状态`} onChange={(event) => void changeStatus(item.id, event.target.value)}>{statuses.filter((value) => value !== "published" || item.status === "published" || (canPublish && kind === "articles")).map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></div> : "只读"}</td></tr>) : <tr><td colSpan={5} className="admin-empty">暂无{label}记录</td></tr>}</tbody></table></div>
+        {deleteItem && <section className="admin-feedback" role="alert" aria-label="确认删除内容"><p>确认删除“{deleteItem.title}”？删除后会从前台下架，记录和历史订单保留，可在已归档中恢复。</p><div className="admin-row-actions"><button type="button" className="admin-row-action" disabled={busy} onClick={() => void removeItem()}>{busy ? "正在删除…" : "确认删除"}</button><button type="button" className="admin-row-action" disabled={busy} onClick={() => setDeleteItem(null)}>取消</button></div></section>}
+        <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>
+          {readState === "loading" ? <tr><td colSpan={5} className="admin-empty">正在读取{label}…</td></tr>
+            : readState === "error" ? <tr><td colSpan={5} className="admin-empty" role="alert">无法读取{label}，请重试。</td></tr>
+              : items.length ? items.map((item) => <tr key={item.id}>
+                <td><b>{item.title}</b>{item.is_demo && <span className="admin-tag">设计示例</span>}<small>/{kind === "products" ? "products" : "news"}/{item.slug}</small></td>
+                <td>{item.content_categories?.name ?? "—"}</td><td><span className="admin-tag">{statusLabels[item.status] ?? item.status}</span></td><td>{new Date(item.updated_at).toLocaleDateString("zh-CN")}</td>
+                <td>{canEdit && (canPublish || item.status !== "published") ? <div className="admin-row-actions">
+                  <Link className="admin-row-action" href={kind === "products" ? `/admin/products/${item.id}` : `/admin/news/${item.id}`}>编辑内容</Link>
+                  <select disabled={busy} value={item.status} aria-label={`${item.title}的发布状态`} onChange={(event) => void changeStatus(item.id, event.target.value)}>{statuses.filter((value) => value !== "published" || item.status === "published" || (canPublish && kind === "articles")).map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select>
+                  {item.status === "archived" ? <button className="admin-row-action" type="button" disabled={busy} onClick={() => void changeStatus(item.id, "draft")}>恢复草稿</button> : <button className="admin-row-action" type="button" disabled={busy} onClick={() => setDeleteItem(item)}>删除</button>}
+                </div> : "只读"}</td>
+              </tr>) : <tr><td colSpan={5} className="admin-empty">暂无{label}记录</td></tr>}
+        </tbody></table></div>
         {readState === "error" && <button className="admin-row-action" type="button" onClick={() => void load()}>重试</button>}
         {readState === "ready" && <div className="admin-pagination"><span>共 {total} 条 · 第 {page}/{pages} 页</span><div><button disabled={page === 1} onClick={() => setPage((value) => value - 1)}>上一页</button><button disabled={page === pages} onClick={() => setPage((value) => value + 1)}>下一页</button></div></div>}
       </section>

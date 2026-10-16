@@ -38,7 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   detail.overview = text(detail.overview, 10000); detail.packagingIntro = text(detail.packagingIntro, 1000);
   detail.packagingImage = safeUrl(detail.packagingImage);
   detail.topNotes = text(detail.topNotes, 400); detail.heartNotes = text(detail.heartNotes, 400); detail.baseNotes = text(detail.baseNotes, 400);
-  detail.technical = detail.technical.slice(0, 30).map((row) => ({ label: text(row.label, 100), value: text(row.value, 500) })).filter((row) => row.label && row.value);
+  detail.technical = detail.technical.slice(0, 100).map((row) => ({ label: text(row.label, 100), value: text(row.value, 1000) })).filter((row) => row.label && row.value);
+  detail.descriptionImages = detail.descriptionImages.slice(0, 60).map((image) => ({ url: safeUrl(image.url), alt: text(image.alt, 180), ...(Number.isInteger(image.width) && Number(image.width) > 0 && Number(image.width) <= 30000 ? { width: image.width } : {}), ...(Number.isInteger(image.height) && Number(image.height) > 0 && Number(image.height) <= 30000 ? { height: image.height } : {}) })).filter((image) => image.url);
   detail.dosage = detail.dosage.slice(0, 20).map((row) => ({ label: text(row.label, 100), value: text(row.value, 300) })).filter((row) => row.label && row.value);
   detail.applications = detail.applications.slice(0, 12).map((item) => ({ title: text(item.title, 100), description: text(item.description, 300), image: safeUrl(item.image), alt: text(item.alt, 180) })).filter((item) => item.title && item.image);
   detail.storage = detail.storage.slice(0, 20).map((item) => text(item, 300)).filter(Boolean);

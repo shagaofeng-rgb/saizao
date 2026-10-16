@@ -1,4 +1,4 @@
-export type ProductImage = { url: string; alt: string };
+export type ProductImage = { url: string; alt: string; width?: number; height?: number };
 export type DetailRow = { label: string; value: string };
 export type ApplicationCard = { title: string; description: string; image: string; alt: string };
 export type DownloadCard = { title: string; url: string; note: string };
@@ -24,6 +24,7 @@ export type ProductDetail = {
   downloads: DownloadCard[];
   faqs: Faq[];
   relatedSlugs: string[];
+  descriptionImages: ProductImage[];
 };
 
 export type RetailVariant = {
@@ -64,6 +65,10 @@ export type RetailProduct = {
   is_demo: boolean;
   content_categories?: { name: string; slug: string } | null;
   variants: RetailVariant[];
+  source_provider?: string | null;
+  source_id?: string | null;
+  source_url?: string | null;
+  source_synced_at?: string | null;
 };
 
 export const emptyProductDetail: ProductDetail = {
@@ -86,6 +91,7 @@ export const emptyProductDetail: ProductDetail = {
   downloads: [],
   faqs: [],
   relatedSlugs: [],
+  descriptionImages: [],
 };
 
 export function normalizeDetail(value: unknown): ProductDetail {
@@ -112,6 +118,7 @@ export function normalizeDetail(value: unknown): ProductDetail {
     downloads: array<DownloadCard>("downloads"),
     faqs: array<Faq>("faqs"),
     relatedSlugs: array<string>("relatedSlugs"),
+    descriptionImages: array<ProductImage>("descriptionImages"),
   };
 }
 
