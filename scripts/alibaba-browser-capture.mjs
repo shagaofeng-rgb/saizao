@@ -18,18 +18,20 @@ export async function createCapture({ productTab, descriptionTab, directory }) {
   const catalog = JSON.parse(await fs.readFile(`${directory}/catalog.json`, "utf8"));
   const records = new Map(JSON.parse(await fs.readFile(`${directory}/details.json`, "utf8")).map((record) => [record.id, record]));
   async function read(product) {
-    await productTab.playwright.locator('[data-testid="module-attribute-row"]').first().waitFor({ state: "attached", timeoutMs: 15000 });
-    await productTab.playwright.locator('[data-testid="media-image"] img').first().waitFor({ state: "attached", timeoutMs: 15000 });
+    await productTab.playwright.locator('[data-testid="module-attribute-row"]').first().waitFor({ state: "attached", timeoutMs: 15000 }).catch(() => { throw new Error(`Attributes not ready: ${product.id}`); });
+    await productTab.playwright.locator('[data-testid="media-image"] img').first().waitFor({ state: "attached", timeoutMs: 15000 }).catch(() => { throw new Error(`Gallery not ready: ${product.id}`); });
     let description;
     if (await productTab.playwright.locator('[data-testid="module-structure-description"]').count()) {
       await productTab.playwright.locator('[data-testid="module-structure-description"] img').first().getAttribute("src", { timeoutMs: 15000 });
       description = await productTab.playwright.locator('[data-testid="module-structure-description"] > div > div:last-child').evaluate(descriptionContent);
       description.sections = [{ kind: "structured", text: description.text, images: description.images, rows: [] }];
     } else {
+      await productTab.playwright.locator('iframe[src*="descIframe"]').waitFor({ state: "attached", timeoutMs: 15000 }).catch(() => { throw new Error(`Description frame not ready: ${product.id}`); });
       const source = await productTab.playwright.locator('iframe[src*="descIframe"]').getAttribute("src", { timeoutMs: 15000 });
       const descriptionUrl = new URL(source, product.url).href;
       if (await descriptionTab.url() !== descriptionUrl) await descriptionTab.goto(descriptionUrl);
-      await descriptionTab.playwright.locator("#J-rich-text-description .J_module img").first().getAttribute("src", { timeoutMs: 15000 });
+      await descriptionTab.playwright.locator("#J-rich-text-description").waitFor({ state: "attached", timeoutMs: 15000 }).catch(() => { throw new Error(`Description content not ready: ${product.id}`); });
+      await descriptionTab.getAXState({ emit: false });
       description = await descriptionTab.playwright.locator("#J-rich-text-description").evaluate(descriptionContent);
     }
     const record = await productTab.playwright.evaluate(() => ({

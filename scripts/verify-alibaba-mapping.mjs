@@ -36,4 +36,7 @@ assert.equal(mapped.detail.topNotes, "");
 assert.equal(mapped.detail.applications.length, 0);
 assert.equal(mapped.variants, undefined);
 assert.throws(() => mapSource({ ...record, attributes: [] }, source), /Incomplete verification/);
+const longTitle = "High Quality Concentrated Devotion Perfume Oil Good Raw Material Brand Fragrance Oil in Liquid Form Wholesale";
+const longMapped = mapSource({ ...record, title: longTitle, attributes: [{ label: "Type", value: "Oil" }] }, source);
+assert.match(longMapped.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug truncation must not leave a doubled separator");
 console.log("Source parameters, wholesale-price labeling, image deduplication and non-fabrication verified offline.");
