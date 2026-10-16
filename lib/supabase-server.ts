@@ -29,7 +29,9 @@ export async function supabaseRequest(path: string, init: RequestInit = {}) {
 export async function rpc<T>(functionName: string, body: Json): Promise<T> {
   if (!/^[a-z][a-z0-9_]*$/.test(functionName)) throw new Error("Invalid RPC name.");
   const response = await supabaseRequest(`rest/v1/rpc/${functionName}`, { method: "POST", body: JSON.stringify(body) });
-  return response.json() as Promise<T>;
+  // PostgreSQL void RPCs (including audit writes) return a successful empty body.
+  const result = await response.text();
+  return (result ? JSON.parse(result) : null) as T;
 }
 export async function rest<T>(path: string, init: RequestInit = {}) {
   const response = await supabaseRequest(`rest/v1/${path.replace(/^\//, "")}`, init);

@@ -12,6 +12,7 @@ const categoryId = "22222222-2222-4222-8222-222222222222";
 const productId = "33333333-3333-4333-8333-333333333333";
 const secret = "isolated-product-upload-verification-only-secret";
 const writes = [];
+const categoryWrites = [];
 const syncRuns = [];
 let verificationRole = "admin";
 let appOutput = "";
@@ -23,13 +24,15 @@ const upstream = createServer(async (request, response) => {
   const url = new URL(request.url, "http://local.test");
   response.setHeader("Content-Type", "application/json");
   if (url.pathname === "/rest/v1/rpc/admin_get_session_account") return response.end(JSON.stringify([{ is_active: true, session_version: 1, role: verificationRole, email: "verification@example.test", display_name: "Local verification", force_password_reset: false }]));
-  if (request.method === "GET" && url.pathname === "/rest/v1/content_categories") return response.end(JSON.stringify([{ id: categoryId }]));
+  if (request.method === "GET" && url.pathname === "/rest/v1/content_categories") return response.end(JSON.stringify(url.searchParams.has("source_provider") ? categoryWrites.map((item) => ({ id: categoryId, ...item })) : [{ id: categoryId }]));
+  if (request.method === "POST" && url.pathname === "/rest/v1/content_categories") { categoryWrites.push(body); return response.end(JSON.stringify([{ id: categoryId, ...body }])); }
+  if (request.method === "GET" && url.pathname === "/rest/v1/media_assets") return response.end(JSON.stringify([{ public_url: "https://pohsefmowgthjskmbkyg.supabase.co/storage/v1/object/public/website-media/offline-test.webp", file_name: "alibaba-offline-960x960", deleted_at: null }]));
   if (request.method === "GET" && url.pathname === "/rest/v1/articles") return response.end("[]");
   if (request.method === "POST" && url.pathname === "/rest/v1/products") {
     if (body.slug === "duplicate-product") { response.statusCode = 409; return response.end(JSON.stringify({ message: "unique constraint" })); }
     writes.push(body); return response.end(JSON.stringify([{ id: productId, ...body }]));
   }
-  if (request.method === "GET" && url.pathname === "/rest/v1/products") return response.end(JSON.stringify(url.searchParams.has("source_provider") ? [] : writes.map((item) => ({ id: productId, ...item }))));
+  if (request.method === "GET" && url.pathname === "/rest/v1/products") return response.end(JSON.stringify((url.searchParams.has("source_provider") ? writes.filter((item) => item.source_provider === "alibaba") : writes).map((item) => ({ id: productId, ...item }))));
   if (request.method === "PATCH" && url.pathname === "/rest/v1/products") {
     Object.assign(writes[0], body); return response.end(JSON.stringify([{ id: productId, ...writes[0] }]));
   }
@@ -40,7 +43,7 @@ const upstream = createServer(async (request, response) => {
   if (request.method === "PATCH" && url.pathname === "/rest/v1/integration_sync_runs") {
     Object.assign(syncRuns[0], body); response.statusCode = 204; return response.end();
   }
-  if (url.pathname === "/rest/v1/rpc/admin_log_audit") return response.end("{}");
+  if (url.pathname === "/rest/v1/rpc/admin_log_audit") { response.statusCode = 204; return response.end(); }
   response.statusCode = 500; response.end(JSON.stringify({ message: `Unexpected upstream path ${url.pathname}` }));
 });
 upstream.listen(0, "127.0.0.1"); await once(upstream, "listening");
@@ -106,6 +109,18 @@ try {
   verificationRole = "editor";
   assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported, publish: true })).status, 403);
   verificationRole = "admin";
+  const categories = [{ id: "902415060", name: "Offline category", parentId: "products", url: "https://zjszsj.en.alibaba.com/productgrouplist-902415060/Offline.html" }];
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "categories", categories })).status, 200, "empty successful audit RPCs must not interrupt imports");
+  assert.equal((await adminRequest("/api/admin/import/products", "POST", { mode: "categories", categories })).status, 200);
+  assert.equal(categoryWrites.length, 1, "repeated category import must not duplicate records");
+  imported.data.gallery = [{ url: "https://s.alicdn.com/@sc04/kf/H11111111111111111111111111111111a.jpg", alt: "Offline source image" }];
+  const importedResponse = await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported, publish: true });
+  assert.equal(importedResponse.status, 200, await importedResponse.text());
+  assert.equal(writes.length, 2); assert.equal(writes[1].source_id, imported.sourceId);
+  assert.equal(writes[1].status, "published"); assert.equal(writes[1].retail_enabled, false); assert.equal(writes[1].is_demo, false);
+  assert.equal(writes[1].gallery[0].width, 960);
+  assert.equal((await (await adminRequest("/api/admin/import/products", "POST", { mode: "product", product: imported, publish: true })).json()).skipped, true);
+  assert.equal(writes.length, 2, "repeated product import must preserve the existing record");
   const day = new Date().toISOString().slice(0, 10);
   const syncResponse = await fetch(`${origin}/api/admin/sync`, { method: "POST", headers: { "Content-Type": "application/json", Origin: requestOrigin, Cookie: cookie }, body: JSON.stringify({ from: day, to: day }) });
   assert.equal(syncResponse.status, 200, "successful empty 204 writes must not become a false server error");
