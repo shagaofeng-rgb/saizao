@@ -95,4 +95,8 @@
 .retail-faq summary{display:flex;align-items:center;min-height:48px}
 .retail-related h3{font-size:18px}
 .retail-related span{font-size:13px}
+.retail-hero-product{background:var(--cream)}
+.retail-hero-product>img,.retail-gallery img{object-fit:contain}
+.retail-hero-product:after{display:none}
+.retail-summary h1,.retail-table dt,.retail-table dd{overflow-wrap:anywhere}
 @media(max-width:650px){.retail-process>div{grid-template-columns:1fr}.retail-or{position:static;transform:none;justify-self:center;margin-block:-17px}.retail-brief-band{padding:28px 22px}.retail-hero-copy p{max-width:27ch;font-size:14px}}
