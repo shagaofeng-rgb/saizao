@@ -12,6 +12,7 @@ const categoryId = "22222222-2222-4222-8222-222222222222";
 const productId = "33333333-3333-4333-8333-333333333333";
 const secret = "isolated-product-upload-verification-only-secret";
 const writes = [];
+const syncRuns = [];
 let appOutput = "";
 const upstream = createServer(async (request, response) => {
   const chunks = [];
@@ -26,6 +27,13 @@ const upstream = createServer(async (request, response) => {
     if (body.slug === "duplicate-product") { response.statusCode = 409; return response.end(JSON.stringify({ message: "unique constraint" })); }
     writes.push(body); return response.end(JSON.stringify([{ id: productId, ...body }]));
   }
+  if (request.method === "POST" && url.pathname === "/rest/v1/integration_sync_runs") {
+    const run = { id: "44444444-4444-4444-8444-444444444444", ...body };
+    syncRuns.push(run); return response.end(JSON.stringify([run]));
+  }
+  if (request.method === "PATCH" && url.pathname === "/rest/v1/integration_sync_runs") {
+    Object.assign(syncRuns[0], body); response.statusCode = 204; return response.end();
+  }
   if (url.pathname === "/rest/v1/rpc/admin_log_audit") return response.end("{}");
   response.statusCode = 500; response.end(JSON.stringify({ message: `Unexpected upstream path ${url.pathname}` }));
 });
@@ -34,7 +42,7 @@ const portReservation = createServer(); portReservation.listen(0, "127.0.0.1"); 
 const appPort = portReservation.address().port; await new Promise((resolve) => portReservation.close(resolve));
 const upstreamPort = upstream.address().port;
 const app = spawn(process.execPath, [path.resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(appPort)], {
-  env: { ...process.env, NODE_ENV: "production", ADMIN_SESSION_SECRET: secret, SUPABASE_URL: `http://127.0.0.1:${upstreamPort}`, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${upstreamPort}`, SUPABASE_SERVICE_ROLE_KEY: "local-verification-only" },
+  env: { ...process.env, NODE_ENV: "production", ADMIN_SESSION_SECRET: secret, SUPABASE_URL: `http://127.0.0.1:${upstreamPort}`, NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${upstreamPort}`, SUPABASE_SERVICE_ROLE_KEY: "local-verification-only", GOOGLE_SERVICE_ACCOUNT_JSON: "", GOOGLE_ANALYTICS_PROPERTY_ID: "" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 for (const stream of [app.stdout, app.stderr]) stream.on("data", (chunk) => { appOutput += chunk; });
@@ -72,7 +80,12 @@ try {
   assert.equal(writes[0].retail_enabled, false); assert.equal(writes[0].created_by, accountId);
   assert.equal((await post({ ...draft, slug: "duplicate-product" })).status, 400);
   assert.equal(writes.length, 1, "duplicate slugs must not create a second product");
-  console.log("Product creation API verified: authentication, validation, media persistence, draft status and duplicate handling. Production data was not touched.");
+  const day = new Date().toISOString().slice(0, 10);
+  const syncResponse = await fetch(`${origin}/api/admin/sync`, { method: "POST", headers: { "Content-Type": "application/json", Origin: requestOrigin, Cookie: cookie }, body: JSON.stringify({ from: day, to: day }) });
+  assert.equal(syncResponse.status, 200, "successful empty 204 writes must not become a false server error");
+  assert.equal((await syncResponse.json()).status, "failed", "unconfigured integrations must retain their real state");
+  assert.equal(syncRuns.length, 1); assert.ok(syncRuns[0].finished_at);
+  console.log("Product creation and empty-write responses verified: authentication, validation, media persistence, draft status, duplicate handling and sync completion. Production data was not touched.");
 } finally {
   if (app.exitCode === null) { const stopped = once(app, "exit"); app.kill("SIGTERM"); await stopped; }
   await new Promise((resolve) => upstream.close(resolve));

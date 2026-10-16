@@ -33,7 +33,9 @@ export async function rpc<T>(functionName: string, body: Json): Promise<T> {
 }
 export async function rest<T>(path: string, init: RequestInit = {}) {
   const response = await supabaseRequest(`rest/v1/${path.replace(/^\//, "")}`, init);
-  return { data: await response.json() as T, response };
+  // PostgREST returns an empty 204 body for successful minimal writes.
+  const body = await response.text();
+  return { data: (body ? JSON.parse(body) : null) as T, response };
 }
 export async function submitLead(lead: Json, fingerprint: string) {
   return rpc<{ stored: boolean; id: string; reason?: string }>("submit_lead", { p_lead: lead, p_fingerprint: fingerprint });
