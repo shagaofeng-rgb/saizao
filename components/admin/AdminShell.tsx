@@ -4,14 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { ChartPieSlice, FolderOpen, Handshake, Images, List, MagnifyingGlass, NewspaperClipping, Package, ShieldCheck, SignOut, Truck, ShoppingBag, Users, UsersFour, X } from "@phosphor-icons/react";
+import { ChartPieSlice, FolderOpen, Handshake, Images, List, MagnifyingGlass, NewspaperClipping, Package, Plus, ShieldCheck, SignOut, Truck, ShoppingBag, Users, UsersFour, X } from "@phosphor-icons/react";
 import { useAdminRole } from "@/components/admin/AdminRoleContext";
 
 const navigation = [
   { href: "/admin", label: "业务概览", icon: ChartPieSlice },
   { href: "/admin/visitors", label: "访客中心", icon: Users },
   { href: "/admin/inquiries", label: "询盘管理", icon: Handshake },
-  { href: "/admin/products", label: "产品内容", icon: Package },
+  { href: "/admin/products", label: "产品管理", icon: Package },
+  { href: "/admin/products/new", label: "上传产品", icon: Plus },
   { href: "/admin/categories", label: "分类管理", icon: FolderOpen },
   { href: "/admin/media", label: "媒体资料", icon: Images },
   { href: "/admin/orders", label: "零售订单", icon: ShoppingBag },
@@ -29,7 +30,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const sidebar = useRef<HTMLElement>(null);
   const role = useAdminRole();
   const canManageStaff = role === "super_admin" || role === "admin";
-  const isActive = (href: string) => href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const canEditContent = canManageStaff || role === "content_editor";
+  const isActive = (href: string) => href === "/admin" || href === "/admin/products/new" ? pathname === href : (pathname === href || pathname.startsWith(`${href}/`)) && !(href === "/admin/products" && pathname === "/admin/products/new");
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -73,7 +75,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <Link key={item.href} className={isActive(item.href) ? "active" : ""} aria-current={isActive(item.href) ? "page" : undefined} href={item.href} onClick={() => setMenuOpen(false)}><item.icon weight="regular" aria-hidden="true" />{item.label}</Link>
           ))}
           <p className="admin-nav-label">内容管理</p>
-          {navigation.slice(3).filter((item) => item.href !== "/admin/shipping" || canManageStaff).filter((item) => item.href !== "/admin/orders" || canManageStaff || role === "sales").map((item) => (
+          {navigation.slice(3).filter((item) => item.href !== "/admin/products/new" || canEditContent).filter((item) => item.href !== "/admin/shipping" || canManageStaff).filter((item) => item.href !== "/admin/orders" || canManageStaff || role === "sales").map((item) => (
             <Link key={item.href} className={isActive(item.href) ? "active" : ""} aria-current={isActive(item.href) ? "page" : undefined} href={item.href} onClick={() => setMenuOpen(false)}><item.icon weight="regular" aria-hidden="true" />{item.label}</Link>
           ))}
           {canManageStaff && <><p className="admin-nav-label">系统管理</p>

@@ -36,17 +36,23 @@ export async function POST(request:Request,{params}:{params:Promise<{kind:string
   const session=await getAdminSession(); const table=await tableFrom(params);
   if(!session||!table||!canManageContent(session.role)) return NextResponse.json({message:"Unauthorized"},{status:401});
   if(!isSameOrigin(request)||requestBodyTooLarge(request,250000)) return NextResponse.json({message:"请求校验失败。"},{status:400});
-  const body=await request.json().catch(()=>({})), title=String(body.title??"").trim().slice(0,180), entrySlug=slug(body.slug||title);
+  const parsed=await request.json().catch(()=>null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return NextResponse.json({ message: "请填写有效的内容资料。" }, { status: 400 });
+  const body=parsed, title=String(body.title??"").trim().slice(0,180), entrySlug=slug(body.slug||title);
   if(title.length<2||!entrySlug) return NextResponse.json({message:"请填写标题与有效链接标识。"},{status:400});
   const status=["draft","review","published","archived"].includes(body.status)?body.status:"draft";
   if (status === "published" && (!canPublishContent(session.role) || table === "products")) return NextResponse.json({ message: table === "products" ? "请先保存商品，再到详情编辑页完成资料和发布检查。" : "只有管理员可以发布内容。" }, { status: 403 });
-  const category_id=await categoryId(body.categoryId,table==="products"?"product":"article");
+  const category_id=await categoryId(body.categoryId,table==="products"?"product":"article").catch(() => undefined);
+  if (category_id === undefined) return NextResponse.json({ message: "分类暂时无法读取，请重试。" }, { status: 503 });
   if (body.categoryId && !category_id) return NextResponse.json({ message: "请选择已启用的分类。" }, { status: 400 });
-  const common={title,slug:entrySlug,category_id,content:String(body.content??"").slice(0,30000),cover_url:mediaUrl(body.coverUrl),attachment_url:mediaUrl(body.attachmentUrl),seo_title:String(body.seoTitle??"").slice(0,180)||null,seo_description:String(body.seoDescription??"").slice(0,320)||null,status,published_at:status==="published"?new Date().toISOString():null,created_by:session.accountId,updated_by:session.accountId};
-  const payload=table==="products"?{...common,summary:String(body.summary??"").slice(0,600)||null,application:String(body.application??"").slice(0,160)||null}:{...common,excerpt:String(body.summary??"").slice(0,600)||null,article_type:["news","faq","market","insight"].includes(body.articleType)?body.articleType:"news"};
+  const cover_url=mediaUrl(body.coverUrl), attachment_url=mediaUrl(body.attachmentUrl), hero_url=mediaUrl(body.heroUrl);
+  const gallery = Array.isArray(body.gallery) ? body.gallery.slice(0,12).map((value: unknown) => { const image = value && typeof value === "object" ? value as Record<string,unknown> : {}; return { url: mediaUrl(image.url), alt: String(image.alt ?? title).trim().slice(0,180) }; }) : [];
+  if ((body.coverUrl && !cover_url) || (body.attachmentUrl && !attachment_url) || (table === "products" && ((body.heroUrl && !hero_url) || (body.gallery !== undefined && !Array.isArray(body.gallery)) || (Array.isArray(body.gallery) && body.gallery.length > 12) || gallery.some((image: { url: string | null }) => !image.url)))) return NextResponse.json({ message: "请检查图片与附件链接，图集最多 12 张。" }, { status: 400 });
+  const common={title,slug:entrySlug,category_id,content:String(body.content??"").slice(0,30000),cover_url,attachment_url,seo_title:String(body.seoTitle??"").slice(0,180)||null,seo_description:String(body.seoDescription??"").slice(0,320)||null,status,published_at:status==="published"?new Date().toISOString():null,created_by:session.accountId,updated_by:session.accountId};
+  const payload=table==="products"?{...common,hero_url,gallery,retail_enabled:false,summary:String(body.summary??"").slice(0,600)||null,application:String(body.application??"").slice(0,160)||null}:{...common,excerpt:String(body.summary??"").slice(0,600)||null,article_type:["news","faq","market","insight"].includes(body.articleType)?body.articleType:"news"};
   if (status === "published" && (!payload.content.trim() || !payload.cover_url || !category_id)) return NextResponse.json({ message: "发布前请补齐正文、封面和分类。" }, { status: 400 });
   const saved=await rest<Record<string,unknown>[]>(table,{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)}).catch(()=>null);
-  if(!saved) return NextResponse.json({message:"保存失败，链接标识可能已存在。"},{status:400});
+  if(!saved?.data[0]?.id) return NextResponse.json({message:"保存失败，链接标识可能已存在。"},{status:400});
   await rpc("admin_log_audit",{p_actor_id:session.accountId,p_action:"content_created",p_entity_type:table,p_entity_id:String(saved.data[0]?.id??""),p_metadata:{status}}).catch(()=>undefined);
   return NextResponse.json({ok:true,data:saved.data[0]});
 }
