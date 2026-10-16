@@ -77,7 +77,10 @@ export function ProductCreateForm() {
     event.preventDefault(); if (operationLock.current) return;
     if (form.title.trim().length < 2 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) {
       setActiveTab("basic"); setHasError(true); setMessage(form.title.trim().length < 2 ? "请填写至少两个字的产品名称。" : "页面地址请使用英文字母、数字和短横线。");
-      requestAnimationFrame(() => (form.title.trim().length < 2 ? nameInput.current : slugInput.current)?.focus()); return;
+      requestAnimationFrame(() => {
+        const input = form.title.trim().length < 2 ? nameInput.current : slugInput.current;
+        input?.focus({ preventScroll: true }); input?.scrollIntoView({ block: "center", behavior: "auto" });
+      }); return;
     }
     operationLock.current = true; setSaving(true); setMessage(""); setHasError(false);
     try {
