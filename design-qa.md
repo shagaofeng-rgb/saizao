@@ -5,8 +5,8 @@ Final result: passed
 ## Reference and implementation
 
 - Approved visual reference: `/Users/apple/.codex/generated_images/01a052a3-4406-7c31-9a2e-bed52a4a1e1d/exec-8c7332a0-677e-466a-a6b3-1526fcfcdd22.png` (1487 × 1058).
-- Desktop implementation capture: `/tmp/saizhao-product-design-desktop-qa.png` (1440 × 1024).
-- Mobile implementation capture: `/tmp/saizhao-product-design-mobile-qa.png` (390 × 844).
+- Final Preview desktop capture: `/tmp/saizhao-product-scheme1-preview-desktop-final.png` (1440 × 1024).
+- Final Preview mobile capture: `/tmp/saizhao-product-scheme1-preview-mobile.png` (390 × 844).
 - Implementation: shared site header/footer, product breadcrumb, left image gallery, right title/facts/enquiry, followed by overview/specifications.
 
 ## Comparison and states
@@ -20,7 +20,7 @@ Final result: passed
 | Below fold | Overview and specifications use the same two-column composition; long specifications and description imagery are expandable. Sections with no source data are omitted. |
 | Responsive/accessibility | At 390px, title and image are readable, no horizontal overflow, gallery buttons have names and pressed states, and the quote link remains reachable. |
 
-The source mock includes decorative foliage and more marketing copy than the product record contains. Those are intentionally not invented in the implementation. The gallery includes source-provided data sheet images rather than generated stand-ins. The desktop capture includes the Next.js development badge, which is not part of the production UI.
+The source mock includes decorative foliage and more marketing copy than the product record contains. Those are intentionally not invented in the implementation. The gallery includes source-provided data sheet images rather than generated stand-ins.
 
 ## Verification
 
@@ -30,9 +30,11 @@ The source mock includes decorative foliage and more marketing copy than the pro
 - ESLint on changed TS/TSX files: passed.
 - Next.js production build and TypeScript: passed.
 - Impeccable mechanical detector: no findings.
+- Independent finish review: two material findings were corrected and the final verdict was `ship`, with no open findings.
 
 ## Revision history
 
 1. Initial implementation followed the reference's main grid and card placement.
 2. Moved source-backed key facts into the reference's two-column order and adjusted desktop/mobile spacing after screenshot review.
 3. Rechecked images, mobile overflow, and interactive gallery; final result passed.
+4. Removed a duplicated product-title overview and suppressed retail controls for quote-only states. Rechecked the deployed Preview after all images loaded on desktop and mobile.

@@ -39,6 +39,10 @@ Static cards remain flat. Shadows are reserved for layering, hover feedback and 
 
 **Product catalog.** Treat the catalog as a factual collection surface, not a decorative product mosaic. Cards use the existing flat cream surface, divider, editorial heading and terracotta action language, and render only real published, non-demo products. Category navigation is derived from categories represented by those products; missing imagery, an empty collection and unavailable data each receive an explicit honest state rather than a fabricated placeholder product.
 
+**Product detail — editorial product sheet.** The built product page uses the same paper, ink and terracotta identity as the shared header and footer. A quiet breadcrumb leads into a wide product image stage with a narrow vertical thumbnail rail on desktop; the factual title, application subtitle, two-column key-fact grid and primary action occupy the adjacent column. Product imagery is contained on a cream stage so labels and packaging remain legible rather than being cropped for effect. Below, a lightly divided overview and specification pair reads like an editorial product sheet. Additional profile, application, dosage, logistics, downloads, FAQ and related-product sections appear only when corresponding product data exists. Catalog cards follow the same restrained image-and-type rhythm with a bottom divider instead of a boxed mosaic.
+
+**The Product Evidence Rule.** Gallery images, facts, specifications, prices and availability come from the imported product record. Missing imagery receives an explicit unavailable state; absent fields do not acquire decorative stand-ins. The prominent terracotta enquiry action identifies the product in the brief form. Retail controls appear only under the checkout and stock conditions in Interaction.
+
 ## Interaction
 
 - Buttons have a minimum 48 px height; mobile navigation targets are at least 44 px.
@@ -49,6 +53,7 @@ Static cards remain flat. Shadows are reserved for layering, hover feedback and 
 - Motion is limited to the first-view/page fade, mega-panel entrance, purposeful scroll/sticky reveals, loading spinner and restrained image hover movement.
 - `prefers-reduced-motion` removes non-essential motion.
 - Product search, category selection and pagination preserve one visible URL-backed result state. The primary navigation may expose published product categories dynamically, but must always retain direct routes to **All Products** and **Custom Fragrance** when category data is absent.
+- Product-gallery thumbnails indicate the selected image with a terracotta border and `aria-pressed`, support keyboard focus, and show the current image count. Supplementary specifications and description images expand on demand when the imported record is long.
 - Show purchase controls only when checkout is configured and the published, non-demo product has retail enabled with an active in-stock variant. Otherwise use one product-linked enquiry action that carries the product into the brief form; never imply that an unavailable item can be bought online.
 
 Disabled public actions use `.58` opacity, `not-allowed` cursor and no transform. Admin actions use `.52`; disabled pagination uses `.45` and suppresses hover. Loading uses the documented spinner or skeleton state, empty states remain explicit and neutral, errors use the error color without destructive visual drama, and unauthorized admin routes return the login/401 state. A dedicated disabled-input visual is not yet established and must not be invented ad hoc.
@@ -67,6 +72,7 @@ Disabled public actions use `.58` opacity, `not-allowed` cursor and no transform
 - Forms collapse from two columns to one and retain 16 px input text to avoid mobile zoom.
 - Copy must tolerate long translations and addresses without fixed heights or horizontal scrolling.
 - Product catalog cards move from three columns to two below `900px` and one below `650px`; category filters become a horizontally scrollable control row on narrow screens. Product detail split layouts also stack below `900px`, with supporting grids simplified below `650px`.
+- On product detail pages, the stacked order below `900px` is title and introduction, gallery, then facts and action. Below `650px`, the gallery thumbnail rail becomes a horizontally scrollable row beneath the main image; overview/specifications and supporting panels become one column. Long imported names and specification values wrap without horizontal page scrolling.
 
 The public navigation condenses at `1190px`; the product catalog/detail use `900 / 650px`, while general public sections use `1050 / 780 / 560 / 460 / 390 / 360px`. Primary split grids stack at 780px, and narrower breakpoints tighten gutters, card internals, forms and floating safe-area spacing. The admin breakpoint map is `1120 / 860 / 600 / 390px`: metrics and content grids reduce, the sidebar becomes a mobile drawer, and controls/pagination stack where necessary.
 
