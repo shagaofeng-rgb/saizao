@@ -24,7 +24,7 @@ export function ProductImport({ canPublish }: { canPublish: boolean }) {
     if (!file || busy || (file.products.length < file.sourceTotal && !partial)) return;
     setBusy(true); stop.current = false; setMessage("正在同步分类…"); setCompleted(0); setResults([]); setPage(1);
     try {
-      const categories = await fetch("/api/admin/import/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "categories", categories: file.categories }) });
+      const categories = await fetch("/api/admin/import/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "categories", categories: file.categories }), signal: AbortSignal.timeout(70000) });
       const categoryResult = await categories.json();
       if (!categories.ok) throw new Error(categoryResult.message || "分类同步失败。");
       let failures = 0;
@@ -33,7 +33,7 @@ export function ProductImport({ canPublish }: { canPublish: boolean }) {
         setMessage(`正在导入：${product.data.title}`);
         let result: Result;
         try {
-          const response = await fetch("/api/admin/import/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "product", product, publish }) });
+          const response = await fetch("/api/admin/import/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "product", product, publish }), signal: AbortSignal.timeout(70000) });
           const saved = await response.json();
           if (!response.ok || !saved.data?.id) throw new Error(saved.message || "导入未完成。");
           result = { sourceId: product.sourceId, title: product.data.title, state: saved.skipped ? "skipped" : "created", id: saved.data.id };
