@@ -10,16 +10,24 @@ const catalogPageSize = 12;
 
 type ProductRow = Omit<RetailProduct, "detail" | "variants"> & { detail: unknown; gallery: unknown };
 
-async function hydrateProduct(row: ProductRow): Promise<RetailProduct> {
+async function hydrateProducts(rows: ProductRow[]): Promise<RetailProduct[]> {
+  if (!rows.length) return [];
+  const ids = rows.map((row) => row.id);
   const response = await rest<RetailVariant[]>(
-    `retail_variants?select=*&product_id=eq.${encodeURIComponent(row.id)}&order=sort_order.asc`,
+    `retail_variants?select=*&product_id=in.(${ids.join(",")})&order=sort_order.asc`,
   );
-  return {
+  const variants = new Map<string, RetailVariant[]>();
+  for (const variant of response.data) {
+    const group = variants.get(variant.product_id) ?? [];
+    group.push(variant);
+    variants.set(variant.product_id, group);
+  }
+  return rows.map((row) => ({
     ...row,
     detail: normalizeDetail(row.detail),
     gallery: Array.isArray(row.gallery) ? row.gallery as RetailProduct["gallery"] : [],
-    variants: response.data,
-  };
+    variants: variants.get(row.id) ?? [],
+  }));
 }
 
 export async function getRetailProductBySlug(slug: string) {
@@ -28,7 +36,7 @@ export async function getRetailProductBySlug(slug: string) {
     const response = await rest<ProductRow[]>(
       `products?select=${productSelect}&slug=eq.${slug}&status=eq.published&is_demo=eq.false&limit=1`,
     );
-    return response.data[0] ? hydrateProduct(response.data[0]) : null;
+    return response.data[0] ? (await hydrateProducts(response.data))[0] : null;
   } catch { return null; }
 }
 
@@ -38,7 +46,7 @@ export async function getRetailProductForAdmin(id: string) {
     const response = await rest<ProductRow[]>(
       `products?select=${productSelect},source_provider,source_id,source_url,source_synced_at&id=eq.${id}&limit=1`,
     );
-    return response.data[0] ? hydrateProduct(response.data[0]) : null;
+    return response.data[0] ? (await hydrateProducts(response.data))[0] : null;
   } catch { return null; }
 }
 
@@ -49,8 +57,7 @@ export async function getRelatedRetailProducts(slugs: string[], excludeId: strin
     const response = await rest<ProductRow[]>(
       `products?select=${productSelect}&slug=in.(${values.join(",")})&status=eq.published&is_demo=eq.false&limit=4`,
     );
-    const products = await Promise.all(response.data.filter((row) => row.id !== excludeId).map(hydrateProduct));
-    return products;
+    return hydrateProducts(response.data.filter((row) => row.id !== excludeId));
   } catch { return [] as RetailProduct[]; }
 }
 
@@ -91,7 +98,7 @@ export async function getRetailCatalogPage({ query = "", category = "", page = 1
     const total = Number.isFinite(count) ? count : response.data.length;
     const actualPage = Math.min(requestedPage, Math.max(1, Math.ceil(total / catalogPageSize)));
     if (actualPage !== requestedPage) response = await load(actualPage);
-    return { items: await Promise.all(response.data.map(hydrateProduct)), total, page: actualPage, unavailable: false };
+    return { items: await hydrateProducts(response.data), total, page: actualPage, unavailable: false };
   } catch { return { items: [], total: 0, page: requestedPage, unavailable: true }; }
 }
 

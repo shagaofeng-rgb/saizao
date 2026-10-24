@@ -8,11 +8,11 @@ import { AdminDateRange } from "@/components/admin/AdminDateRange";
 import { AdminDateRangeValue, adminDateQuery, adminDateRange, validAdminDateRange } from "@/lib/admin-date-range";
 import type { GoogleReporting } from "@/lib/google-reporting";
 
-type Metrics = { visitors: number; sessions: number; pageViews: number; leads: number; excluded: number };
+type Metrics = { visitors: number; sessions: number; pageViews: number; leads: number; excluded: number; notificationIssues?: number };
 type Dashboard = { metrics: Metrics; countries: { label: string; value: number }[]; sources: { label: string; value: number }[]; pages: { label: string; value: number }[] };
 type LoadState = "loading" | "ready" | "setup" | "error";
 
-const sourceLabels: Record<string, string> = { direct: "直接访问", google: "Google", "google-organic": "Google 自然搜索", "bing-organic": "Bing 自然搜索", "meta-organic": "社交媒体", "linkedin-organic": "LinkedIn 自然搜索", linkedin: "LinkedIn" };
+const sourceLabels: Record<string, string> = { direct: "直接访问", google: "Google", "google-organic": "Google 来源", "google-referral": "Google 来源", "bing-organic": "Bing 来源", "bing-referral": "Bing 来源", "meta-organic": "Meta 来源", "meta-referral": "Meta 来源", "linkedin-organic": "LinkedIn 来源", "linkedin-referral": "LinkedIn 来源", linkedin: "LinkedIn" };
 const displaySource = (value: string) => sourceLabels[value.toLowerCase()] ?? value;
 
 export function AdminDashboard() {
@@ -84,6 +84,7 @@ export function AdminDashboard() {
       <small>{state === "ready" ? origin : state === "loading" ? "正在读取" : "暂不可核实"}</small>
     </Link>)}</section>
     {(state === "setup" || state === "error") && <section className="admin-callout" role="alert"><h2>{state === "setup" ? "数据源暂不可用" : "无法读取业务数据"}</h2><p>当前不能核实指标，请稍后重试。页面不会用默认数字代替真实结果。</p><button className="admin-row-action" type="button" onClick={refresh}>重试</button></section>}
+    {state === "ready" && data && (data.metrics.notificationIssues ?? 0) > 0 && <section className="admin-callout" role="status"><h2>部分询盘邮件通知未送达</h2><p>所选时间内有 {data.metrics.notificationIssues} 条询盘的邮件通知未配置或发送失败。询盘已保存，请在询盘管理中查看并跟进。</p><Link className="admin-row-action" href="/admin/inquiries">查看询盘</Link></section>}
     {state === "ready" && data && data.metrics.visitors === 0 && data.metrics.leads === 0 && <section className="admin-callout"><h2>所选时间内暂无记录</h2><p>可以调整时间范围，或进入访客中心、询盘管理查看明细。</p><div className="admin-callout-actions"><Link className="admin-row-action" href="/admin/visitors">查看访客</Link><Link className="admin-primary" href="/admin/inquiries">查看询盘</Link></div></section>}
     <section className="admin-grid admin-overview-grid" aria-label="访问分析">
       <Summary title="主要访问地区" rows={data?.countries ?? []} state={state} icon={GlobeHemisphereWest} href="/admin/visitors" onSelect={setCountry} />

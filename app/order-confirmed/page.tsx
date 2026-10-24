@@ -6,6 +6,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ClearCartAfterOrder } from "@/components/retail/ClearCartAfterOrder";
 import { rest } from "@/lib/supabase-server";
+import type { Metadata } from "next";
+export const metadata: Metadata = { title: "Order Confirmation", robots: { index: false, follow: false } };
 export default async function OrderConfirmed({ searchParams }: { searchParams: Promise<{ number?: string }> }) {
   const [id, secret] = ((await cookies()).get("sz_retail_confirm")?.value || "").split(".");
   const number = (await searchParams).number;

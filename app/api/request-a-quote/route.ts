@@ -4,6 +4,7 @@ import { cleanText, fingerprint, isSameOrigin, requestBodyTooLarge } from "@/lib
 import { isSupabaseConfigured, recordLeadNotification, submitLead } from "@/lib/supabase-server";
 import { metaCookie, sendMetaLeadEvent } from "@/lib/meta-conversions";
 import { notifyTeam } from "@/lib/lead-notifications";
+import { inferTrafficSource } from "@/lib/traffic-source";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     country_code: cleanText(request.headers.get("x-vercel-ip-country"), 8) || null,
     page_path: field(form, "pagePath", 500) || null,
     referrer: field(form, "referrer", 2048) || null,
-    source: field(form, "utm_source", 160) || null,
+    source: inferTrafficSource(field(form, "referrer", 2048), field(form, "utm_source", 160)),
     medium: field(form, "utm_medium", 160) || null,
     campaign: field(form, "utm_campaign", 220) || null,
     term: field(form, "utm_term", 220) || null,

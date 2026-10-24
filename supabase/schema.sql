@@ -390,7 +390,7 @@ create or replace function public.admin_dashboard(
   p_country text default null,
   p_source text default null,
   p_page integer default 1,
-  p_page_size integer default 25
+  p_page_size integer default 20
 )
 returns jsonb
 language sql
@@ -421,7 +421,7 @@ visitor_rows as (
     coalesce(max(s.country_code), 'Unknown') as country,
     coalesce(max(s.source), 'Direct') as source,
     coalesce(max(s.ip_masked), '') as ip_masked,
-    count(*) as visits,
+    count(distinct s.id) as visits,
     max(s.last_seen_at) as last_seen,
     (array_agg(e.page_path order by e.created_at desc))[1] as latest_page
   from selected_sessions s
@@ -444,6 +444,7 @@ select jsonb_build_object(
     'sessions', (select count(*) from selected_sessions),
     'pageViews', (select count(*) from selected_events where event_name = 'page_view'),
     'leads', (select count(*) from public.leads where created_at >= p_start and created_at <= p_end),
+    'notificationIssues', (select count(*) from public.leads where created_at >= p_start and created_at <= p_end and notification_status in ('failed', 'not_configured')),
     'excluded', (select count(*) from public.analytics_events where created_at >= p_start and created_at <= p_end and is_excluded = true)
   ),
   'countries', coalesce((select jsonb_agg(jsonb_build_object('label', country, 'value', visits) order by visits desc) from (
@@ -456,16 +457,16 @@ select jsonb_build_object(
     select coalesce(page_path, '/') as page_path, count(*) as views from selected_events where event_name = 'page_view' group by 1 order by 2 desc limit 6
   ) x), '[]'::jsonb),
   'visitors', coalesce((select jsonb_agg(jsonb_build_object(
-    'anonymousId', anonymous_id, 'country', country, 'source', source, 'visits', visits,
-    'lastSeen', to_char(last_seen at time zone 'UTC', 'YYYY-MM-DD HH24:MI'),
+    'id', visitor_id, 'anonymousId', anonymous_id, 'country', country, 'source', source, 'visits', visits,
+    'lastSeen', last_seen,
     'latestPage', coalesce(latest_page, '/'), 'ipMasked', ip_masked, 'classification', case when visits >= 3 then 'Returning' else 'New' end
   ) order by last_seen desc) from (
-    select * from ordered_visitors offset greatest((p_page - 1) * p_page_size, 0) limit least(greatest(p_page_size, 25), 100)
+    select * from ordered_visitors offset greatest((p_page - 1) * least(greatest(p_page_size, 20), 100), 0) limit least(greatest(p_page_size, 20), 100)
   ) x), '[]'::jsonb),
   'visitorTotal', (select count(*) from visitor_rows),
   'leads', coalesce((select jsonb_agg(jsonb_build_object(
     'name', name, 'company', company, 'country', coalesce(country_code, 'Unknown'), 'source', source,
-    'createdAt', to_char(created_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI'), 'status', status
+    'createdAt', created_at, 'status', status
   ) order by created_at desc) from recent_leads), '[]'::jsonb)
 );
 $$;

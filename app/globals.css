@@ -345,6 +345,7 @@ main { animation: page-enter .7s cubic-bezier(.22, 1, .36, 1) both; }
 @media (max-width: 780px) {
   .nav-mega, .nav-mega-trigger { width: 100%; }
   .nav-mega-trigger { justify-content: space-between; }
+  .nav-mega-trigger button { min-width: 44px; min-height: 44px; }
   .mega-panel { position: static; width: 100%; margin-top: 6px; padding: 12px; border-radius: 10px; box-shadow: none; }
   .mega-panel-open { grid-template-columns: 1fr; gap: 8px; }
   .mega-panel > div { grid-template-columns: 1fr; gap: 0; }

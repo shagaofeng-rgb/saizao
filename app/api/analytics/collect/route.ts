@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import { cleanText, clientIp, fingerprint, isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 import { isSupabaseConfigured, rpc } from "@/lib/supabase-server";
+import { inferTrafficSource } from "@/lib/traffic-source";
 
 const automatedTraffic = /(bot|crawler|spider|scrapy|headless|lighthouse|uptime|monitor|collect|axios|curl|wget|python-requests)/i;
 
@@ -8,19 +9,6 @@ function maskIp(value: string) {
   if (!value || value === "unknown") return null;
   if (value.includes(".")) return value.replace(/\.\d+$/, ".*");
   return value.replace(/:[^:]+$/, ":*");
-}
-
-function inferSource(value: string, explicit: string) {
-  if (explicit) return explicit;
-  try {
-    const host = new URL(value).hostname.toLowerCase();
-    if (/google\./.test(host)) return "google-organic";
-    if (/bing\./.test(host)) return "bing-organic";
-    if (/facebook|instagram/.test(host)) return "meta-organic";
-    if (/linkedin/.test(host)) return "linkedin-organic";
-    if (host) return host;
-  } catch {}
-  return null;
 }
 
 function ipHash(value: string) {
@@ -65,7 +53,7 @@ export async function POST(request: Request) {
         page_path: path,
         page_title: cleanText(body.title, 180),
         referrer: cleanText(body.referrer, 2048) || null,
-        source: inferSource(cleanText(body.referrer, 2048), cleanText(body.utmSource, 160)),
+        source: inferTrafficSource(cleanText(body.referrer, 2048), cleanText(body.utmSource, 160)),
         medium: cleanText(body.utmMedium, 160) || null,
         campaign: cleanText(body.utmCampaign, 220) || null,
         term: cleanText(body.utmTerm, 220) || null,

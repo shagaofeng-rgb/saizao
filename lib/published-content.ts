@@ -21,6 +21,19 @@ async function list(table:"products"|"articles") {
 export const publishedProducts=()=>list("products");
 export const publishedArticles=()=>list("articles");
 
+export async function publishedArticleSlugs(): Promise<{ slug: string; published_at: string | null }[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const articles: { slug: string; published_at: string | null }[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const page = (await rest<{ slug: string; published_at: string | null }[]>(`articles?select=slug,published_at&status=eq.published&order=published_at.desc&limit=500&offset=${offset}`)).data;
+      articles.push(...page);
+      if (page.length < 500) break;
+    }
+    return articles;
+  } catch { return []; }
+}
+
 async function one(table:"products"|"articles", slug:string) {
   if (!/^[a-z0-9-]{1,120}$/.test(slug)||!isSupabaseConfigured()) return null;
   const fields=table==="products"?productFields:articleFields;
