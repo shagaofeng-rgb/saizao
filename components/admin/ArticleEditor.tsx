@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 
-type Article = { id: string; title: string; slug: string; category_id: string | null; article_type: string; excerpt: string | null; content: string | null; cover_url: string | null; attachment_url: string | null; seo_title: string | null; seo_description: string | null; status: string; updated_at: string };
+type Article = { id: string; title: string; slug: string; category_id: string | null; article_type: string; excerpt: string | null; content: string | null; cover_url: string | null; cover_alt: string | null; attachment_url: string | null; seo_title: string | null; seo_description: string | null; focus_keywords: string | null; status: string; updated_at: string };
 type Category = { id: string; name: string };
 type Revision = { id: string; created_at: string };
 const statusLabels: Record<string, string> = { draft: "草稿", review: "待审核", published: "已发布", archived: "已归档" };
@@ -57,7 +57,10 @@ export function ArticleEditor({ id, canPublish }: { id: string; canPublish: bool
         <label>正文<textarea rows={16} value={article.content || ""} onChange={(e) => update("content", e.target.value)} /></label>
         <h2>媒体与搜索展示</h2>
         <div className="admin-form-grid"><label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={(e) => void upload(e.target.files?.[0], "cover_url")} />{article.cover_url && <small>已设置封面图片</small>}</label><label>附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={(e) => void upload(e.target.files?.[0], "attachment_url")} />{article.attachment_url && <small>已设置附件</small>}</label></div>
+        <label>媒体库封面链接<input type="url" value={article.cover_url || ""} onChange={(e) => update("cover_url", e.target.value || null)} /><small>可复制媒体库中已上传图片的链接。</small></label>
+        <label>封面图片替代文字<input maxLength={180} value={article.cover_alt || ""} onChange={(e) => update("cover_alt", e.target.value || null)} /></label>
         <div className="admin-form-grid"><label>搜索标题<input maxLength={180} value={article.seo_title || ""} onChange={(e) => update("seo_title", e.target.value)} /></label><label>搜索摘要<textarea rows={3} maxLength={320} value={article.seo_description || ""} onChange={(e) => update("seo_description", e.target.value)} /></label></div>
+        <label>重点关键词<input maxLength={500} value={article.focus_keywords || ""} onChange={(e) => update("focus_keywords", e.target.value || null)} /><small>多个词组用英文逗号分隔。</small></label>
         <label>发布状态<select value={article.status} disabled={busy || (article.status === "published" && !canPublish)} onChange={(e) => update("status", e.target.value)}>{Object.entries(statusLabels).filter(([value]) => canPublish || value !== "published" || article.status === "published").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <div className="admin-row-actions"><button className="admin-primary" type="submit" disabled={busy}>{busy ? "正在保存…" : "保存资讯"}</button>{article.status === "published" && <Link className="admin-row-action" target="_blank" href={`/news/${article.slug}`}>查看公开页面</Link>}</div>
         <p role="status" className="admin-feedback">{message}</p>

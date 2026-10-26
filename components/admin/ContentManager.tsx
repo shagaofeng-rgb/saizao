@@ -34,7 +34,7 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
   const [busy, setBusy] = useState(false);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [form, setForm] = useState({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", status: "draft", coverUrl: "", attachmentUrl: "" });
+  const [form, setForm] = useState({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", focusKeywords: "", coverAlt: "", status: "draft", coverUrl: "", attachmentUrl: "" });
 
   useEffect(() => { if (kind !== "articles" || !canEdit) return; let live = true; fetch("/api/admin/categories?kind=article&pageSize=100", { cache: "no-store" }).then((response) => response.json()).then((result) => { if (live && Array.isArray(result.data)) setCategories(result.data.filter((item: { is_enabled: boolean }) => item.is_enabled)); }).catch(() => undefined); return () => { live = false; }; }, [kind, canEdit]);
 
@@ -81,7 +81,7 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
       return;
     }
     setMessage("已保存。");
-    setForm({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", status: "draft", coverUrl: "", attachmentUrl: "" });
+    setForm({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", focusKeywords: "", coverAlt: "", status: "draft", coverUrl: "", attachmentUrl: "" });
     setPage(1);
     void load();
   }
@@ -129,7 +129,9 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
           <label>封面图片<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "coverUrl")} />{form.coverUrl && <small>已上传</small>}</label>
           <label>附件<input type="file" accept="application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => event.target.files?.[0] && void upload(event.target.files[0], "attachmentUrl")} />{form.attachmentUrl && <small>已上传</small>}</label>
         </div>
-        <details><summary>搜索展示设置</summary><label>搜索标题<input value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>搜索摘要<textarea rows={2} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label></details>
+        <label>媒体库封面链接<input type="url" value={form.coverUrl} onChange={(event) => setForm((value) => ({ ...value, coverUrl: event.target.value }))} /><small>可复制媒体库中已上传图片的链接。</small></label>
+        <label>封面图片替代文字<input maxLength={180} value={form.coverAlt} onChange={(event) => setForm((value) => ({ ...value, coverAlt: event.target.value }))} /></label>
+        <details><summary>搜索展示设置</summary><label>搜索标题<input maxLength={180} value={form.seoTitle} onChange={(event) => setForm((value) => ({ ...value, seoTitle: event.target.value }))} /></label><label>搜索摘要<textarea rows={2} maxLength={320} value={form.seoDescription} onChange={(event) => setForm((value) => ({ ...value, seoDescription: event.target.value }))} /></label><label>重点关键词<input maxLength={500} value={form.focusKeywords} onChange={(event) => setForm((value) => ({ ...value, focusKeywords: event.target.value }))} /><small>多个词组用英文逗号分隔。</small></label></details>
         <button className="admin-primary" disabled={busy}>{busy ? "正在保存…" : `保存${label}`}</button>
         <div aria-live="polite">{message && <p className="admin-feedback">{message}</p>}</div>
       </form>}

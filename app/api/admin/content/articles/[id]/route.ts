@@ -15,14 +15,14 @@ function mediaUrl(value: unknown) {
     return url.protocol === "https:" && url.hostname === "pohsefmowgthjskmbkyg.supabase.co" && url.pathname.startsWith("/storage/v1/object/public/website-media/") ? raw : null;
   } catch { return null; }
 }
-type Article = { id: string; title: string; slug: string; category_id: string | null; article_type: string; excerpt: string | null; content: string | null; cover_url: string | null; attachment_url: string | null; seo_title: string | null; seo_description: string | null; status: string; updated_at: string };
+type Article = { id: string; title: string; slug: string; category_id: string | null; article_type: string; excerpt: string | null; content: string | null; cover_url: string | null; cover_alt: string | null; attachment_url: string | null; seo_title: string | null; seo_description: string | null; focus_keywords: string | null; status: string; updated_at: string };
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await getAdminSession())) return NextResponse.json({ message: "请先登录。" }, { status: 401 });
   const { id } = await params;
   if (!uuid.test(id)) return NextResponse.json({ message: "资讯编号无效。" }, { status: 400 });
   try {
     const [article, revisions] = await Promise.all([
-      rest<Article[]>(`articles?select=id,title,slug,category_id,article_type,excerpt,content,cover_url,attachment_url,seo_title,seo_description,status,updated_at&id=eq.${id}&limit=1`),
+      rest<Article[]>(`articles?select=id,title,slug,category_id,article_type,excerpt,content,cover_url,cover_alt,attachment_url,seo_title,seo_description,focus_keywords,status,updated_at&id=eq.${id}&limit=1`),
       rest<{ id: string; created_at: string; actor_id: string | null }[]>(`content_revisions?select=id,created_at,actor_id&entity_type=eq.articles&entity_id=eq.${id}&order=created_at.desc&limit=10`),
     ]);
     return article.data[0] ? NextResponse.json({ data: article.data[0], revisions: revisions.data }) : NextResponse.json({ message: "资讯不存在。" }, { status: 404 });
@@ -50,7 +50,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const category = await rest<{ id: string }[]>(`content_categories?select=id&id=eq.${categoryId}&content_kind=eq.article&is_enabled=eq.true&deleted_at=is.null&limit=1`);
       if (!category.data[0]) return NextResponse.json({ message: "请选择已启用的资讯分类。" }, { status: 400 });
     }
-    const payload = { title, slug, category_id: categoryId, article_type: types.includes(body.article_type) ? body.article_type : "news", excerpt: text(body.excerpt, 600) || null, content, cover_url: cover, attachment_url: mediaUrl(body.attachment_url), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, status, published_at: status === "published" ? new Date().toISOString() : null, updated_at: new Date().toISOString(), updated_by: session.accountId };
+    const payload = { title, slug, category_id: categoryId, article_type: types.includes(body.article_type) ? body.article_type : "news", excerpt: text(body.excerpt, 600) || null, content, cover_url: cover, cover_alt: text(body.cover_alt, 180) || null, attachment_url: mediaUrl(body.attachment_url), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, focus_keywords: text(body.focus_keywords, 500) || null, status, published_at: status === "published" ? new Date().toISOString() : null, updated_at: new Date().toISOString(), updated_by: session.accountId };
     const result = await rest<Article[]>(`articles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
     if (!result.data[0]) return NextResponse.json({ message: "保存失败。" }, { status: 400 });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "article_updated", p_entity_type: "articles", p_entity_id: id, p_metadata: { status } }).catch(() => undefined);

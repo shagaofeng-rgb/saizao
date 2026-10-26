@@ -3,13 +3,13 @@ import { isSupabaseConfigured, rest } from "@/lib/supabase-server";
 
 export type PublishedItem = {
   id:string; title:string; slug:string; summary?:string; excerpt?:string; content:string;
-  cover_url?:string; attachment_url?:string; application?:string; article_type?:string;
-  published_at?:string; seo_title?:string; seo_description?:string;
+  cover_url?:string; cover_alt?:string; attachment_url?:string; application?:string; article_type?:string;
+  published_at?:string; seo_title?:string; seo_description?:string; focus_keywords?:string;
   content_categories?:{name:string}|null;
 };
 
 const productFields="id,title,slug,summary,content,cover_url,attachment_url,application,published_at,seo_title,seo_description,content_categories(name)";
-const articleFields="id,title,slug,excerpt,content,cover_url,attachment_url,article_type,published_at,seo_title,seo_description,content_categories(name)";
+const articleFields="id,title,slug,excerpt,content,cover_url,cover_alt,attachment_url,article_type,published_at,seo_title,seo_description,focus_keywords,content_categories(name)";
 
 async function list(table:"products"|"articles") {
   if (!isSupabaseConfigured()) return [] as PublishedItem[];
