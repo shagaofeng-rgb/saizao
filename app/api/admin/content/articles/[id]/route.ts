@@ -50,7 +50,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const category = await rest<{ id: string }[]>(`content_categories?select=id&id=eq.${categoryId}&content_kind=eq.article&is_enabled=eq.true&deleted_at=is.null&limit=1`);
       if (!category.data[0]) return NextResponse.json({ message: "请选择已启用的资讯分类。" }, { status: 400 });
     }
-    const payload = { title, slug, category_id: categoryId, article_type: types.includes(body.article_type) ? body.article_type : "news", excerpt: text(body.excerpt, 600) || null, content, cover_url: cover, cover_alt: text(body.cover_alt, 180) || null, attachment_url: mediaUrl(body.attachment_url), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, focus_keywords: text(body.focus_keywords, 500) || null, status, published_at: status === "published" ? new Date().toISOString() : null, updated_at: new Date().toISOString(), updated_by: session.accountId };
+    const publication = status === "published"
+      ? current.data[0].status === "published" ? {} : { published_at: new Date().toISOString() }
+      : { published_at: null };
+    const payload = { title, slug, category_id: categoryId, article_type: types.includes(body.article_type) ? body.article_type : "news", excerpt: text(body.excerpt, 600) || null, content, cover_url: cover, cover_alt: text(body.cover_alt, 180) || null, attachment_url: mediaUrl(body.attachment_url), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, focus_keywords: text(body.focus_keywords, 500) || null, status, ...publication, updated_at: new Date().toISOString(), updated_by: session.accountId };
     const result = await rest<Article[]>(`articles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
     if (!result.data[0]) return NextResponse.json({ message: "保存失败。" }, { status: 400 });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "article_updated", p_entity_type: "articles", p_entity_id: id, p_metadata: { status } }).catch(() => undefined);
