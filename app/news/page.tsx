@@ -18,5 +18,25 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function News() {
   const items = await publishedArticles();
-  return <><SiteHeader /><main id="main-content" className="catalog-page"><header className="catalog-hero"><p className="eyebrow">NEWS & INSIGHTS</p><h1>Updates from Sai Zhao Fragrance.</h1><p>Company news, fragrance insight, FAQs and market-oriented content published by our team.</p></header><section className="catalog-grid">{items.length ? items.map((item) => <article className="catalog-card" key={item.id}>{item.cover_url && <Image src={item.cover_url} alt={item.cover_alt || item.title} width={1200} height={900} sizes="(max-width: 780px) 100vw, 33vw" />}<div><p className="eyebrow">{item.content_categories?.name ?? item.article_type ?? "NEWS"}</p><h2>{item.title}</h2><p>{item.excerpt}</p><Link className="text-link" href={`/news/${item.slug}`}>Read article</Link></div></article>) : <p className="catalog-empty">No news has been published yet.</p>}</section></main><SiteFooter /></>;
+  return <>
+    <SiteHeader />
+    <main id="main-content" className="news-index-page">
+      <header className="news-index-header">
+        <h1>News from Sai Zhao</h1>
+        <p>Exhibitions, company updates and notes from our fragrance team.</p>
+      </header>
+      <section className="news-index-list" aria-label="Published news">
+        {items.length ? items.map((item) => <article className="news-index-card" key={item.id}>
+          {item.cover_url && <Link className="news-index-image" href={`/news/${item.slug}`} aria-label={`Read ${item.title}`}><Image src={item.cover_url} alt={item.cover_alt || item.title} width={1200} height={900} sizes="(max-width: 780px) 100vw, 50vw" /></Link>}
+          <div className="news-index-copy">
+            <p className="news-index-category">{item.content_categories?.name ?? item.article_type ?? "News"}</p>
+            <h2><Link href={`/news/${item.slug}`}>{item.title}</Link></h2>
+            {item.excerpt && <p className="news-index-summary">{item.excerpt}</p>}
+            <Link className="news-index-read" href={`/news/${item.slug}`}>Read article</Link>
+          </div>
+        </article>) : <p className="news-index-empty">No news has been published yet.</p>}
+      </section>
+    </main>
+    <SiteFooter />
+  </>;
 }

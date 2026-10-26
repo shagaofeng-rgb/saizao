@@ -33,5 +33,28 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
     mainEntityOfPage: `${siteUrl}/news/${item.slug}`,
   };
   const publishedDate = item.published_at ? new Date(item.published_at) : null;
-  return <><SiteHeader /><main id="main-content" className="detail-page"><article><p className="eyebrow">{item.content_categories?.name ?? item.article_type ?? "NEWS"}</p><h1>{item.title}</h1>{publishedDate && <time className="detail-date" dateTime={publishedDate.toISOString()}>{new Intl.DateTimeFormat("en", { timeZone: "Asia/Shanghai", year: "numeric", month: "long", day: "numeric" }).format(publishedDate)}</time>}{item.cover_url && <Image className="detail-cover" src={item.cover_url} alt={item.cover_alt || item.title} width={1600} height={900} sizes="(max-width: 780px) 100vw, 820px" priority />}<p className="detail-intro">{item.excerpt}</p><ArticleBody content={item.content} />{item.attachment_url && <a className="text-link" href={item.attachment_url} target="_blank" rel="noreferrer">Download attachment</a>}<Link className="button" href="/request-a-quote">Share Your Brief</Link></article></main><SiteFooter /><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") }} /></>;
+  return <>
+    <SiteHeader />
+    <main id="main-content" className="news-article-page">
+      <article className="news-article">
+        <header className="news-article-header">
+          <Link className="news-article-back" href="/news">News &amp; Insights</Link>
+          <h1>{item.title}</h1>
+          <div className="news-article-meta">
+            <span>{item.content_categories?.name ?? item.article_type ?? "News"}</span>
+            {publishedDate && <><span aria-hidden="true">·</span><time dateTime={publishedDate.toISOString()}>{new Intl.DateTimeFormat("en", { timeZone: "Asia/Shanghai", year: "numeric", month: "long", day: "numeric" }).format(publishedDate)}</time></>}
+          </div>
+        </header>
+        {item.cover_url && <figure className="news-article-cover"><Image src={item.cover_url} alt={item.cover_alt || item.title} width={1600} height={1200} sizes="(max-width: 780px) 100vw, 960px" priority /></figure>}
+        {item.excerpt && <p className="news-article-intro">{item.excerpt}</p>}
+        <ArticleBody content={item.content} />
+        <footer className="news-article-end">
+          {item.attachment_url && <a className="text-link" href={item.attachment_url} target="_blank" rel="noreferrer">Download attachment</a>}
+          <Link className="button" href="/request-a-quote">Share Your Brief</Link>
+        </footer>
+      </article>
+    </main>
+    <SiteFooter />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") }} />
+  </>;
 }

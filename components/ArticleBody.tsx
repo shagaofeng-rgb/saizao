@@ -23,11 +23,11 @@ function inlineText(value: string): ReactNode[] {
 
 export function ArticleBody({ content }: { content: string }) {
   const blocks = content.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map((value) => value.trim()).filter(Boolean);
-  return <div className="detail-content">{blocks.map((block, index) => {
+  return <div className="news-article-body">{blocks.map((block, index) => {
     const image = block.match(/^!\[([^\]]{1,180})\]\(([^)]+)\)$/);
     if (image) {
       const src = safeImageUrl(image[2]);
-      if (src) return <figure className="detail-figure" key={index}><Image src={src} alt={image[1]} width={1600} height={1200} sizes="(max-width: 780px) 100vw, 820px" /></figure>;
+      if (src) return <figure className="news-article-figure" key={index}><Image src={src} alt={image[1]} width={1600} height={1200} sizes="(max-width: 780px) 100vw, 720px" /></figure>;
     }
     const heading = block.match(/^(#{2,3})\s+(.+)$/);
     if (heading) return heading[1].length === 2 ? <h2 key={index}>{inlineText(heading[2])}</h2> : <h3 key={index}>{inlineText(heading[2])}</h3>;
