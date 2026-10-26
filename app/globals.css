@@ -660,6 +660,8 @@ input::placeholder, textarea::placeholder { color: #75645b; opacity: 1; }
   .news-article-page { padding-top: 42px; padding-bottom: 72px; }
   .news-article-header { margin-bottom: 26px; }
   .news-article-header h1 { margin-top: 27px; font-size: clamp(36px, 9vw, 54px); line-height: 1.08; }
+  .news-article-meta { display: grid; gap: 6px; }
+  .news-article-meta span[aria-hidden="true"] { display: none; }
   .news-article-cover { margin-bottom: 29px; }
   .news-article-intro { margin-bottom: 26px; }
   .news-article-body { font-size: 16px; line-height: 1.72; }
