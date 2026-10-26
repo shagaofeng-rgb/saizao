@@ -4,12 +4,12 @@ import { isSupabaseConfigured, rest } from "@/lib/supabase-server";
 export type PublishedItem = {
   id:string; title:string; slug:string; summary?:string; excerpt?:string; content:string;
   cover_url?:string; cover_alt?:string; attachment_url?:string; application?:string; article_type?:string;
-  published_at?:string; seo_title?:string; seo_description?:string; focus_keywords?:string;
+  published_at?:string; updated_at?:string; seo_title?:string; seo_description?:string; focus_keywords?:string;
   content_categories?:{name:string}|null;
 };
 
 const productFields="id,title,slug,summary,content,cover_url,attachment_url,application,published_at,seo_title,seo_description,content_categories(name)";
-const articleFields="id,title,slug,excerpt,content,cover_url,cover_alt,attachment_url,article_type,published_at,seo_title,seo_description,focus_keywords,content_categories(name)";
+const articleFields="id,title,slug,excerpt,content,cover_url,cover_alt,attachment_url,article_type,published_at,updated_at,seo_title,seo_description,focus_keywords,content_categories(name)";
 
 async function list(table:"products"|"articles") {
   if (!isSupabaseConfigured()) return [] as PublishedItem[];
@@ -21,12 +21,12 @@ async function list(table:"products"|"articles") {
 export const publishedProducts=()=>list("products");
 export const publishedArticles=()=>list("articles");
 
-export async function publishedArticleSlugs(): Promise<{ slug: string; published_at: string | null }[]> {
+export async function publishedArticleSlugs(): Promise<{ slug: string; published_at: string | null; updated_at: string | null }[]> {
   if (!isSupabaseConfigured()) return [];
   try {
-    const articles: { slug: string; published_at: string | null }[] = [];
+    const articles: { slug: string; published_at: string | null; updated_at: string | null }[] = [];
     for (let offset = 0; ; offset += 500) {
-      const page = (await rest<{ slug: string; published_at: string | null }[]>(`articles?select=slug,published_at&status=eq.published&order=published_at.desc&limit=500&offset=${offset}`)).data;
+      const page = (await rest<{ slug: string; published_at: string | null; updated_at: string | null }[]>(`articles?select=slug,published_at,updated_at&status=eq.published&order=published_at.desc&limit=500&offset=${offset}`)).data;
       articles.push(...page);
       if (page.length < 500) break;
     }

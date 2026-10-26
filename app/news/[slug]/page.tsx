@@ -28,6 +28,7 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
     description: item.excerpt || undefined, image: item.cover_url || undefined,
     keywords: item.focus_keywords || undefined,
     datePublished: item.published_at || undefined,
+    dateModified: item.updated_at || item.published_at || undefined,
     author: { "@type": "Organization", name: company.brandName },
     publisher: { "@type": "Organization", name: company.legalName },
     mainEntityOfPage: `${siteUrl}/news/${item.slug}`,
