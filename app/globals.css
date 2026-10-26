@@ -646,6 +646,7 @@ input::placeholder, textarea::placeholder { color: #75645b; opacity: 1; }
 .news-article-body strong { color: var(--ink); font-weight: 650; }
 .news-article-figure { margin: 36px 0 42px; }
 .news-article-figure img { display: block; width: 100%; height: auto; max-height: 650px; border-radius: 8px; object-fit: contain; }
+.news-article-figure figcaption { margin-top: 11px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .news-article-end { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; margin-top: 48px; border-top: 1px solid var(--line); padding-top: 30px; }
 .news-article-end .button { min-height: 48px; border-radius: 4px; }
 .news-article-end .text-link { color: var(--clay-dark); }
