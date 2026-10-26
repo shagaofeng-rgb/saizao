@@ -12,7 +12,7 @@ export const revalidate = 60;
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const item = await publishedArticle((await params).slug);
   return item ? {
-    title: item.seo_title || item.title,
+    title: { absolute: item.seo_title || item.title },
     description: item.seo_description || item.excerpt || undefined,
     keywords: item.focus_keywords?.split(",").map((value) => value.trim()).filter(Boolean),
     alternates: { canonical: `/news/${item.slug}` },
