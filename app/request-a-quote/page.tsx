@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { company } from "@/lib/site-data";
 import { getRetailProductBySlug } from "@/lib/retail-data";
+import { productDisplayTitle } from "@/lib/retail-display";
 
 export const metadata: Metadata = { title: "Request a Fragrance Quote", description: "Share your fragrance product brief with Sai Zhao.", alternates: { canonical: "/request-a-quote" } };
 export default async function RequestQuotePage({ searchParams }: { searchParams: Promise<{ product?: string | string[] }> }) {
@@ -23,7 +24,7 @@ export default async function RequestQuotePage({ searchParams }: { searchParams:
         <p>Share the application, estimated quantity, destination and target delivery date if you know them.</p>
         <p className="direct-call">Prefer a direct call? Contact {company.contactName} at <a href={company.telephoneHref}>{company.telephone}</a>.</p>
       </div>
-      <QuoteForm productTitle={product?.title} />
+      <QuoteForm product={product ? { slug: product.slug, title: productDisplayTitle(product) } : undefined} />
     </section>
     <SiteFooter />
   </main>;

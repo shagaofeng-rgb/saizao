@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { ArrowUpRight, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { isTestVisit, measurementConsent, measurementSession, pageAttribution } from "@/lib/visitor-measurement";
 
-export function QuoteForm({ productTitle }: { productTitle?: string }) {
+export function QuoteForm({ product }: { product?: { slug: string; title: string } }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -18,14 +18,14 @@ export function QuoteForm({ productTitle }: { productTitle?: string }) {
 
     try {
       const form = new FormData(formElement);
-      if (productTitle) form.set("brief", `Product of interest: ${productTitle}\n\n${String(form.get("brief") ?? "")}`);
+      if (product) form.set("brief", `Product of interest: ${product.title}\n\n${String(form.get("brief") ?? "")}`);
       const url = new URL(window.location.href);
       const session = measurementSession(url);
       const attribution = session?.attribution ?? pageAttribution(url, document.referrer);
       const measurementAllowed = measurementConsent() === "granted" && !isTestVisit();
       const metaEventId = measurementAllowed ? crypto.randomUUID?.() ?? "" : "";
       const application = String(form.get("application") ?? "");
-      form.set("pagePath", url.pathname);
+      form.set("pagePath", product ? `${url.pathname}?${new URLSearchParams({ product: product.slug })}` : url.pathname);
       form.set("referrer", attribution.referrer);
       form.set("anonymousId", session?.anonymousId ?? "");
       form.set("metaEventId", metaEventId);
@@ -56,7 +56,7 @@ export function QuoteForm({ productTitle }: { productTitle?: string }) {
 
   return (
     <form className="quote-form" onSubmit={submit} aria-busy={status === "sending"}>
-      {productTitle && <p className="quote-product-context">Product of interest: <strong>{productTitle}</strong></p>}
+      {product && <p className="quote-product-context">Product of interest: <strong>{product.title}</strong></p>}
       <div className="form-grid">
         <label>Name <span aria-hidden="true">*</span><input required name="name" autoComplete="name" maxLength={160} placeholder="Your name" /></label>
         <label>Work email <span aria-hidden="true">*</span><input required type="email" name="email" autoComplete="email" maxLength={254} placeholder="you@company.com" /></label>
