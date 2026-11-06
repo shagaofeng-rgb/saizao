@@ -18,7 +18,11 @@ export function ProductPurchase({ product, preview = false, checkoutEnabled = fa
   const canPurchase = checkoutEnabled && !preview && !product.is_demo && product.retail_enabled && product.status === "published" && available > 0;
   function add(buyNow = false) {
     if (!selected || !canPurchase) return;
-    addCart({ variantId: selected.id, productId: product.id, slug: product.slug, title: product.title, label: selected.label, image: selected.image_url || product.cover_url || product.hero_url || "", quantity });
+    const saved = addCart({ variantId: selected.id, productId: product.id, slug: product.slug, title: product.title, label: selected.label, image: selected.image_url || product.cover_url || product.hero_url || "", quantity });
+    if (!saved) {
+      setMessage("We could not add this item. Check your cart and try again.");
+      return;
+    }
     if (buyNow) router.push("/checkout");
     else setMessage("Added to your cart.");
   }

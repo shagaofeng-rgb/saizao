@@ -58,6 +58,7 @@ export function ProductDetailView({ product, related = [], preview = false }: { 
     .map((value) => value?.trim() || "")
     .find(distinctCopy) || "";
   const applicationText = technical.find((row) => /^application$/i.test(row.label))?.value.trim() || product.application?.trim() || "";
+  const hasOverview = Boolean(overviewText || applicationText);
   const facts = factLabels.flatMap(({ label, matches }) => {
     const row = technical.find((item) => matches.test(item.label.trim()));
     return row ? [{ label, value: row.value.trim() }] : [];
@@ -90,17 +91,17 @@ export function ProductDetailView({ product, related = [], preview = false }: { 
       </div>
     </section>
 
-    {(overviewText || technical.length > 0) && <section className="retail-overview retail-two-column">
-      <div>
+    {(hasOverview || technical.length > 0) && <section className={`retail-overview retail-two-column${hasOverview && technical.length ? "" : " retail-overview-single"}`}>
+      {hasOverview && <div>
         <h2>Product overview</h2>
         {overviewText && <p>{overviewText}</p>}
         {applicationText && <p className="retail-overview-application"><strong>Application</strong> {applicationText}</p>}
-      </div>
-      <div>
+      </div>}
+      {technical.length > 0 && <div>
         <h2>Specifications</h2>
         {technical.length > 0 && <><dl className="retail-table">{technical.slice(0, 12).map((row, index) => <div key={`${row.label}-${index}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>
           {technical.length > 12 && <details className="retail-more-specs"><summary>View all {technical.length} specifications</summary><dl className="retail-table">{technical.slice(12).map((row, index) => <div key={`${row.label}-${index + 12}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl></details>}</>}
-      </div>
+      </div>}
     </section>}
 
     {detail.descriptionImages.length > 0 && <section className="retail-description-images" aria-label="Detailed product information">

@@ -54,3 +54,14 @@ export function adminDateQuery(value: AdminDateRangeValue): { from: string; to: 
     to: new Date(`${value.to}T23:59:59.999+08:00`).toISOString(),
   };
 }
+
+export function adminRangeFromSearch(search: Pick<URLSearchParams, "get">): AdminDateRangeValue {
+  const range: AdminDateRangeValue = { preset: "custom", from: search.get("from") ?? "", to: search.get("to") ?? "" };
+  if (!validAdminDateRange(range)) return adminDateRange("90d");
+  const preset = search.get("period");
+  if (preset === "today" || preset === "week" || preset === "month" || preset === "90d") {
+    const current = adminDateRange(preset);
+    if (current.from === range.from && current.to === range.to) return current;
+  }
+  return range;
+}

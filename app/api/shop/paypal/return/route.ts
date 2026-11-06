@@ -15,17 +15,24 @@ export async function GET(request: NextRequest) {
     if (!order || order.provider_order_id !== paypalId) return failure();
     const supplied = Buffer.from(createHash("sha256").update(secret).digest("hex")); const expected = Buffer.from(order.access_token_hash);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return failure();
+    const confirm = () => {
+      const response = NextResponse.redirect(new URL(`/order-confirmed?number=${encodeURIComponent(order.order_number)}`, request.url));
+      response.cookies.set("sz_retail_payment", "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/shop/paypal", maxAge: 0 });
+      response.cookies.set("sz_retail_confirm", `${order.id}.${secret}`, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/order-confirmed", maxAge: 600 });
+      return response;
+    };
+    if (order.status === "paid") return confirm();
     if (order.status !== "pending" || new Date(order.expires_at).getTime() < Date.now()) return failure();
     const canCapture = await rpc<boolean>("retail_begin_capture", { p_order_id: order.id, p_provider_order_id: paypalId });
-    if (!canCapture) return failure();
+    if (!canCapture) {
+      const latest = (await rest<{ status: string }[]>(`retail_orders?select=status&id=eq.${id}&limit=1`)).data[0];
+      return latest?.status === "paid" ? confirm() : failure();
+    }
     const result = await capturePayPalOrder(paypalId, `capture-${order.id}`);
     const capture = result.purchase_units?.[0]?.payments?.captures?.[0];
     if (result.status !== "COMPLETED" || capture?.status !== "COMPLETED" || capture.amount.currency_code !== order.currency || capture.amount.value !== dollars(order.total_minor)) return failure();
     const paid = await rpc<boolean>("retail_mark_paid", { p_order_id: order.id, p_provider_order_id: paypalId, p_capture_id: capture.id, p_total_minor: order.total_minor, p_currency: order.currency });
     if (!paid) return failure();
-    const response = NextResponse.redirect(new URL(`/order-confirmed?number=${encodeURIComponent(order.order_number)}`, request.url));
-    response.cookies.delete("sz_retail_payment");
-    response.cookies.set("sz_retail_confirm", `${order.id}.${secret}`, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/order-confirmed", maxAge: 600 });
-    return response;
+    return confirm();
   } catch { return failure(); }
 }

@@ -13,9 +13,12 @@ export function SiteHeader() {
   const [activeMenu, setActiveMenu] = useState<"products" | "applications" | null>(null);
   const [productCategories, setProductCategories] = useState<{ id: string; name: string; slug: string; parent_id: string | null }[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [categoriesUnavailable, setCategoriesUnavailable] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const pathname = usePathname();
   const headerRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
 
   const canHover = () => window.matchMedia("(min-width: 1191px) and (hover: hover) and (pointer: fine)").matches;
@@ -38,7 +41,9 @@ export function SiteHeader() {
   const scheduleMenuClose = () => {
     if (!canHover()) return;
     clearMenuCloseTimer();
-    menuCloseTimer.current = window.setTimeout(() => setActiveMenu(null), 160);
+    menuCloseTimer.current = window.setTimeout(() => {
+      if (!headerRef.current?.querySelector(".mega-panel-open")?.contains(document.activeElement)) setActiveMenu(null);
+    }, 180);
   };
 
   useEffect(() => () => clearMenuCloseTimer(), []);
@@ -59,20 +64,24 @@ export function SiteHeader() {
       .then((result) => {
         if (controller.signal.aborted) return;
         setProductCategories(Array.isArray(result.categories) ? result.categories.filter((item: { name?: unknown; slug?: unknown }) => typeof item.name === "string" && typeof item.slug === "string") : []);
+        setCategoriesUnavailable(false);
         setCategoriesLoaded(true);
       })
-      .catch(() => undefined);
+      .catch(() => { if (!controller.signal.aborted) setCategoriesUnavailable(true); });
     return () => controller.abort();
   }, [activeMenu, categoriesLoaded]);
 
   useEffect(() => {
     if (!open && !activeMenu) return;
-    const previousOverflow = document.body.style.overflow;
-    if (open) document.body.style.overflow = "hidden";
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
+      if (event.key !== "Escape" || (!open && !headerRef.current?.contains(document.activeElement))) return;
+      event.preventDefault();
+      if (activeMenu) {
         setActiveMenu(null);
+        headerRef.current?.querySelector<HTMLButtonElement>(`[aria-controls="${activeMenu}-menu"]`)?.focus();
+      } else {
+        setOpen(false);
+        menuToggleRef.current?.focus();
       }
     };
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -84,11 +93,45 @@ export function SiteHeader() {
     window.addEventListener("keydown", closeOnEscape);
     window.addEventListener("mousedown", closeOnOutsideClick);
     return () => {
-      if (open) document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("mousedown", closeOnOutsideClick);
     };
   }, [open, activeMenu]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    navRef.current?.querySelector<HTMLElement>("a[href]")?.focus({ preventScroll: true });
+    const keepFocusInMenu = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !menuToggleRef.current || !navRef.current) return;
+      const elements = Array.from(navRef.current.querySelectorAll<HTMLElement>("a[href],button:not(:disabled)"))
+        .filter((element) => element.getClientRects().length > 0);
+      const first = menuToggleRef.current;
+      const last = elements.at(-1) ?? first;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const mobile = window.matchMedia("(max-width: 1190px)");
+    const closeOnDesktop = () => {
+      if (!mobile.matches) {
+        setOpen(false);
+        setActiveMenu(null);
+      }
+    };
+    window.addEventListener("keydown", keepFocusInMenu);
+    mobile.addEventListener("change", closeOnDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", keepFocusInMenu);
+      mobile.removeEventListener("change", closeOnDesktop);
+    };
+  }, [open]);
 
   return (
     <header className="site-header" ref={headerRef}>
@@ -96,23 +139,24 @@ export function SiteHeader() {
         <Image src="/images/sai-zhao-logo.png" alt="" width={96} height={96} loading="eager" />
         <span>Sai Zhao<br /><small>FRAGRANCE</small></span>
       </Link>
-      <button className="menu-toggle" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="primary-navigation" aria-label={open ? "Close menu" : "Open menu"}>
+      <button ref={menuToggleRef} className="menu-toggle" type="button" onClick={() => open ? closeNavigation() : setOpen(true)} aria-expanded={open} aria-controls="primary-navigation" aria-label={open ? "Close menu" : "Open menu"}>
         {open ? <X size={24} /> : <List size={24} />}
       </button>
-      <nav id="primary-navigation" className={open ? "nav nav-open" : "nav"} aria-label="Primary navigation">
+      <nav ref={navRef} id="primary-navigation" className={open ? "nav nav-open" : "nav"} aria-label="Primary navigation">
         {primaryNav.map((item) => item.href === "/applications" || item.href === "/products" ? (
           <div className="nav-mega" key={item.href} onPointerEnter={() => { if (canHover()) openMenu(item.href === "/products" ? "products" : "applications"); }} onPointerLeave={scheduleMenuClose} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) closeMenu(); }}>
             <div className="nav-mega-trigger">
-              <Link href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined} className={pathname.startsWith(item.href) ? "nav-active" : ""} onFocus={() => openMenu(item.href === "/products" ? "products" : "applications")} onClick={closeNavigation}>{item.label}</Link>
+              <Link href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined} className={pathname.startsWith(item.href) ? "nav-active" : ""} onClick={closeNavigation}>{item.label}</Link>
               <button type="button" aria-label={`${activeMenu === item.href.slice(1) ? "Close" : "Open"} ${item.label.toLowerCase()} menu`} aria-expanded={activeMenu === item.href.slice(1)} aria-controls={`${item.href.slice(1)}-menu`} onClick={() => { clearMenuCloseTimer(); const menu = item.href === "/products" ? "products" : "applications"; setActiveMenu((value) => value === menu ? null : menu); }}><CaretDown size={13} weight="bold" /></button>
             </div>
             <div id={`${item.href.slice(1)}-menu`} className={activeMenu === item.href.slice(1) ? "mega-panel mega-panel-open" : "mega-panel"} onFocus={() => openMenu(item.href === "/products" ? "products" : "applications")}>
               <p>{item.href === "/products" ? "Explore the collection" : "Choose your product route"}</p>
               <div>{item.href === "/products" ? <>
-                <Link href="/products" onClick={closeNavigation}><span>All Products</span><small>Browse the published collection</small></Link>
+                <Link href="/products" onClick={closeNavigation}><span>All products</span><small>Browse fragrance oils and samples</small></Link>
+                {activeMenu === "products" && !categoriesLoaded && <p className="mega-category-status" role="status">{categoriesUnavailable ? "Categories are temporarily unavailable." : "Loading categories…"}</p>}
                 <div className="mega-product-groups">{productCategories.filter((category) => !category.parent_id).map((category) => <div className="mega-product-group" key={category.slug}>
-                  <Link href={`/products?category=${encodeURIComponent(category.slug)}`} onClick={closeNavigation}><span>{category.name}</span></Link>
-                  {productCategories.some((child) => child.parent_id === category.id) && <div className="mega-product-children">{productCategories.filter((child) => child.parent_id === category.id).map((child) => <Link key={child.slug} href={`/products?category=${encodeURIComponent(child.slug)}`} onClick={closeNavigation}>{child.name}</Link>)}</div>}
+                  <Link href={`/products?category=${encodeURIComponent(category.slug)}`} prefetch={false} onClick={closeNavigation}><span>{category.name}</span></Link>
+                  {productCategories.some((child) => child.parent_id === category.id) && <div className="mega-product-children">{productCategories.filter((child) => child.parent_id === category.id).map((child) => <Link key={child.slug} href={`/products?category=${encodeURIComponent(child.slug)}`} prefetch={false} onClick={closeNavigation}>{child.name}</Link>)}</div>}
                 </div>)}</div>
                 <Link className="mega-panel-cta" href="/request-a-quote" onClick={closeNavigation}><span>Custom Fragrance</span><small>Share your product brief with our team</small></Link>
               </> : applications.map((application) => <Link key={application.slug} href={`/applications/${application.slug}`} onClick={closeNavigation}><span>{application.title}</span><small>{application.description}</small></Link>)}</div>
@@ -121,9 +165,10 @@ export function SiteHeader() {
         ) : (
           <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "nav-active" : ""} onClick={closeNavigation}>{item.label}</Link>
         ))}
+        <Link className="nav-drawer-cta" href="/request-a-quote" onClick={closeNavigation}>Request a quote <ArrowUpRight size={16} /></Link>
       </nav>
       <Link className="header-cart" href="/cart" aria-label={`Cart, ${cartCount} items`}><ShoppingBag size={22}/>{cartCount > 0 && <span>{cartCount}</span>}</Link>
-      <Link className="button button-small header-cta" href="/request-a-quote">Share Your Brief <ArrowUpRight size={16} /></Link>
+      <Link className="button button-small header-cta" href="/request-a-quote">Request a quote <ArrowUpRight size={16} /></Link>
     </header>
   );
 }

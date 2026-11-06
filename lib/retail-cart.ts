@@ -1,4 +1,21 @@
 export type CartLine = { variantId: string; productId: string; slug: string; title: string; label: string; image: string; quantity: number };
+type CartItem = Pick<CartLine, "variantId" | "quantity">;
+const variantIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function readCartItems(value: unknown): CartItem[] | null {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 25) return null;
+  const items: CartItem[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!item || typeof item.variantId !== "string" || !variantIdPattern.test(item.variantId)
+      || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20) return null;
+    const variantId = item.variantId.toLowerCase();
+    if (seen.has(variantId)) return null;
+    seen.add(variantId);
+    items.push({ variantId, quantity: item.quantity });
+  }
+  return items;
+}
 const key = "saizhao-retail-cart-v1";
 export function readCart(): CartLine[] {
   if (typeof window === "undefined") return [];
@@ -8,13 +25,17 @@ export function readCart(): CartLine[] {
   } catch { return []; }
 }
 export function writeCart(lines: CartLine[]) {
-  window.localStorage.setItem(key, JSON.stringify(lines));
-  window.dispatchEvent(new Event("saizhao-cart-change"));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(lines));
+    window.dispatchEvent(new Event("saizhao-cart-change"));
+    return true;
+  } catch { return false; }
 }
 export function addCart(line: CartLine) {
   const lines = readCart();
   const existing = lines.find((item) => item.variantId === line.variantId);
   if (existing) existing.quantity = Math.min(20, existing.quantity + line.quantity);
-  else lines.push(line);
-  writeCart(lines);
+  else if (lines.length < 25) lines.push(line);
+  else return false;
+  return writeCart(lines);
 }

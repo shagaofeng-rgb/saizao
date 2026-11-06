@@ -7,5 +7,7 @@ export async function GET(request: NextRequest) {
     const order = (await rest<{ access_token_hash: string }[]>(`retail_orders?select=access_token_hash&id=eq.${id}&limit=1`).catch(() => ({ data: [] }))).data[0];
     if (order) { const actual = Buffer.from(createHash("sha256").update(secret).digest("hex")); const expected = Buffer.from(order.access_token_hash); if (actual.length === expected.length && timingSafeEqual(actual, expected)) await rpc("retail_cancel_order", { p_order_id: id }).catch(() => undefined); }
   }
-  const response = NextResponse.redirect(new URL("/cart?payment=cancelled", request.url)); response.cookies.delete("sz_retail_payment"); return response;
+  const response = NextResponse.redirect(new URL("/cart?payment=cancelled", request.url));
+  response.cookies.set("sz_retail_payment", "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/api/shop/paypal", maxAge: 0 });
+  return response;
 }

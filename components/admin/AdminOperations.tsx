@@ -1,25 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Eye, Funnel, MagnifyingGlass } from "@phosphor-icons/react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminDateRange } from "@/components/admin/AdminDateRange";
-import { AdminDateRangeValue, adminDateQuery, adminDateRange, validAdminDateRange } from "@/lib/admin-date-range";
+import { AdminDateRangeValue, adminDateQuery, adminRangeFromSearch, validAdminDateRange } from "@/lib/admin-date-range";
 
 type PageData<T> = { total: number; items: T[] };
-type Visitor = { id: string; country: string; latestSource: string; sessionCount: number; firstLandingPage: string; lastSeenAt: string };
+type Visitor = { id: string; country: string; latestSource: string; sessionCount: number; firstLandingPage: string | null; lastSeenAt: string };
 type Lead = { id: string; name: string; company: string; email: string; country: string; application?: string; source: string; status: string; createdAt: string; nextFollowUpAt?: string | null };
 type VisitorDetailData = { visitor: { firstSeen: string; lastSeen: string } | null; sessions: { id: string }[]; events: { at: string; page: string; title?: string }[]; leads: { id: string; name: string; company: string; status: string }[] };
 type LeadDetailData = { lead: { name: string; company: string; email: string; phone?: string; country_name?: string; country_code?: string; application?: string; brief?: string; status: string; created_at?: string; next_follow_up_at?: string; visitorId?: string; assigned_to?: string | null; tags?: string[]; notification_status?: string } | null; notes: { id: string; createdAt: string; stage?: string; note: string }[]; duplicates?: { id: string; created_at: string }[] };
 type State = "loading" | "ready" | "error";
 
-const sourceLabels: Record<string, string> = { Direct: "直接访问", direct: "直接访问", "google-organic": "Google 自然搜索", "bing-organic": "Bing 自然搜索", linkedin: "LinkedIn" };
-const source = (value?: string) => sourceLabels[value ?? ""] ?? value ?? "直接访问";
+const sourceLabels: Record<string, string> = { direct: "直接访问 / 来源未知", "google-organic": "Google 来源", "google-referral": "Google 来源", "bing-organic": "Bing 来源", "bing-referral": "Bing 来源", "meta-referral": "Meta 来源", "linkedin-referral": "LinkedIn 来源" };
+const source = (value?: string) => sourceLabels[value?.toLowerCase() || "direct"] ?? value ?? "来源未知";
 const statusLabels: Record<string, string> = { New: "新询盘", Processing: "处理中", Contacted: "已联系", Qualified: "有效商机", Closed: "已完成", Invalid: "无效" };
 const status = (value: string) => statusLabels[value] ?? value;
 const localDateTime = (value?: string) => { if (!value) return ""; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
-const utcDateTime = (value?: string) => value ? new Date(value).toISOString().slice(0, 16).replace("T", " ") : "—";
+const beijingDateTime = (value?: string) => {
+  if (!value) return "—";
+  const utcText = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(value) ? `${value.replace(" ", "T")}Z` : value;
+  const date = new Date(utcText);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
+};
 
 function Pagination({ page, pageSize, total, onPage, onSize }: { page: number; pageSize: number; total: number; onPage: (value: number) => void; onSize: (value: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -34,11 +40,12 @@ function Pagination({ page, pageSize, total, onPage, onSize }: { page: number; p
 }
 
 export function VisitorCenter() {
+  const search = useSearchParams();
   const [data, setData] = useState<PageData<Visitor> | null>(null);
   const [state, setState] = useState<State>("loading");
-  const [range, setRange] = useState<AdminDateRangeValue>(() => adminDateRange("90d"));
+  const [range, setRange] = useState<AdminDateRangeValue>(() => adminRangeFromSearch(search));
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20);
-  const [q, setQ] = useState(""), [country, setCountry] = useState(""), [sourceValue, setSource] = useState("");
+  const [q, setQ] = useState(""), [country, setCountry] = useState(search.get("country") ?? ""), [sourceValue, setSource] = useState(search.get("source") ?? "");
   const requestId = useRef(0);
   const load = useCallback(async () => {
     if (!validAdminDateRange(range)) return;
@@ -56,21 +63,22 @@ export function VisitorCenter() {
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
   }, [range, page, pageSize, q, country, sourceValue]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 220); return () => window.clearTimeout(timer); }, [load]);
 
   return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>访客中心</h1><p className="admin-subtitle">查看已记录的有效访问与页面轨迹。</p></div></header>
     <section className="admin-filters" aria-label="访客筛选"><AdminDateRange id="visitors" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="访客标识或脱敏 IP" /></label><label>国家 / 地区<input value={country} onChange={(event) => { setCountry(event.target.value.toUpperCase()); setPage(1); }} /></label><label>来源渠道<input value={sourceValue} onChange={(event) => { setSource(event.target.value); setPage(1); }} /></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><Funnel aria-hidden="true" />查询</button></section>
     <section className="admin-panel"><div className="admin-panel-heading"><div><h2>访客记录</h2><p className="admin-panel-subtitle">来源：站内访问记录。按匿名访客汇总，不显示完整 IP。</p></div></div>
-      <div className="admin-table-scroll"><table><thead><tr><th>国家/地区</th><th>来源</th><th>会话</th><th>首次进入页面</th><th>最近访问（UTC）</th><th>操作</th></tr></thead><tbody>
-        {state === "loading" ? <tr><td colSpan={6} className="admin-empty">正在读取访客记录…</td></tr> : state === "error" ? <tr><td colSpan={6} className="admin-empty" role="alert">读取失败。请重试，当前不显示旧数据。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td>{item.country}</td><td>{source(item.latestSource)}</td><td>{item.sessionCount}</td><td className="admin-path">{item.firstLandingPage}</td><td>{utcDateTime(item.lastSeenAt)}</td><td><Link className="admin-row-action" href={`/admin/visitors/${item.id}`}><Eye aria-hidden="true" />查看详情</Link></td></tr>) : <tr><td colSpan={6} className="admin-empty">所选条件下暂无访客记录</td></tr>}
+      <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="访客记录表"><table><thead><tr><th>国家/地区</th><th>来源</th><th>会话</th><th>首次进入页面</th><th>最近访问（北京时间）</th><th>操作</th></tr></thead><tbody>
+        {state === "loading" ? <tr><td colSpan={6} className="admin-empty">正在读取访客记录…</td></tr> : state === "error" ? <tr><td colSpan={6} className="admin-empty" role="alert">无法读取访客记录，请重试。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td>{item.country}</td><td>{source(item.latestSource)}</td><td>{item.sessionCount}</td><td className="admin-path">{item.firstLandingPage || "—"}</td><td>{beijingDateTime(item.lastSeenAt)}</td><td><Link className="admin-row-action" href={`/admin/visitors/${item.id}`}><Eye aria-hidden="true" />查看详情</Link></td></tr>) : <tr><td colSpan={6} className="admin-empty">所选条件下暂无访客记录</td></tr>}
       </tbody></table></div>{state === "error" && <button className="admin-row-action" type="button" onClick={() => void load()}>重试</button>}{state === "ready" && data && <Pagination page={page} pageSize={pageSize} total={data.total} onPage={setPage} onSize={setPageSize} />}</section>
   </section></AdminShell>;
 }
 
 export function InquiryCenter({ canExport }: { canExport: boolean }) {
+  const search = useSearchParams();
   const [data, setData] = useState<PageData<Lead> | null>(null);
   const [state, setState] = useState<State>("loading");
-  const [range, setRange] = useState<AdminDateRangeValue>(() => adminDateRange("90d"));
+  const [range, setRange] = useState<AdminDateRangeValue>(() => adminRangeFromSearch(search));
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20);
   const [q, setQ] = useState(""), [statusValue, setStatus] = useState("");
   const requestId = useRef(0);
@@ -89,13 +97,13 @@ export function InquiryCenter({ canExport }: { canExport: boolean }) {
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
   }, [range, page, pageSize, q, statusValue]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 220); return () => window.clearTimeout(timer); }, [load]);
   const exportParams = new URLSearchParams({ ...adminDateQuery(range), q: q.trim(), status: statusValue });
 
   return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>询盘管理</h1><p className="admin-subtitle">查看客户需求，并跟进关联的访问轨迹。</p></div>{canExport && <a className="admin-row-action" href={`/api/admin/inquiries/export?${exportParams}`} download>导出当前筛选结果</a>}</header>
     <section className="admin-filters" aria-label="询盘筛选"><AdminDateRange id="inquiries" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="姓名、公司或邮箱" /></label><label>处理状态<select value={statusValue} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">全部状态</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><MagnifyingGlass aria-hidden="true" />查询</button></section>
-    <section className="admin-panel"><div className="admin-panel-heading"><div><h2>询盘记录</h2><p className="admin-panel-subtitle">来源：客户提交并已保存的询盘。</p></div></div><div className="admin-table-scroll"><table><thead><tr><th>客户</th><th>公司</th><th>国家/地区</th><th>产品应用</th><th>来源</th><th>提交时间（UTC）</th><th>状态</th><th>操作</th></tr></thead><tbody>
-      {state === "loading" ? <tr><td colSpan={8} className="admin-empty">正在读取询盘…</td></tr> : state === "error" ? <tr><td colSpan={8} className="admin-empty" role="alert">读取失败。请重试，当前不显示旧数据。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td><b>{item.name}</b><small>{item.email}</small></td><td>{item.company}</td><td>{item.country}</td><td>{item.application || "—"}</td><td>{source(item.source)}</td><td>{item.createdAt}</td><td><span className="admin-tag">{status(item.status)}</span></td><td><Link className="admin-row-action" href={`/admin/inquiries/${item.id}`}>查看详情</Link></td></tr>) : <tr><td colSpan={8} className="admin-empty">所选条件下暂无询盘</td></tr>}
+    <section className="admin-panel"><div className="admin-panel-heading"><div><h2>询盘记录</h2><p className="admin-panel-subtitle">已保存的客户询盘。</p></div></div><div className="admin-table-scroll" tabIndex={0} role="region" aria-label="询盘记录表"><table><thead><tr><th>客户</th><th>公司</th><th>国家/地区</th><th>产品应用</th><th>来源</th><th>提交时间（北京时间）</th><th>状态</th><th>操作</th></tr></thead><tbody>
+      {state === "loading" ? <tr><td colSpan={8} className="admin-empty">正在读取询盘…</td></tr> : state === "error" ? <tr><td colSpan={8} className="admin-empty" role="alert">无法读取询盘，请重试。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td><b>{item.name}</b><small>{item.email}</small></td><td>{item.company}</td><td>{item.country}</td><td>{item.application || "—"}</td><td>{source(item.source)}</td><td>{beijingDateTime(item.createdAt)}</td><td><span className="admin-tag">{status(item.status)}</span></td><td><Link className="admin-row-action" href={`/admin/inquiries/${item.id}`}>查看详情</Link></td></tr>) : <tr><td colSpan={8} className="admin-empty">所选条件下暂无询盘</td></tr>}
     </tbody></table></div>{state === "error" && <button className="admin-row-action" type="button" onClick={() => void load()}>重试</button>}{state === "ready" && data && <Pagination page={page} pageSize={pageSize} total={data.total} onPage={setPage} onSize={setPageSize} />}</section>
   </section></AdminShell>;
 }

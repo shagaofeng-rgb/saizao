@@ -3,21 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { ArrowUpRight, CheckCircle, WarningCircle } from "@phosphor-icons/react";
-
-type MetaPixel = ((...args: unknown[]) => void) | undefined;
-
-function trackMetaLead(eventId: string, application: string) {
-  const fbq = (window as Window & { fbq?: MetaPixel }).fbq;
-  fbq?.("track", "Lead", { content_name: application || "Fragrance enquiry", content_category: "B2B enquiry" }, { eventID: eventId });
-}
-
-function visitorId() {
-  return document.cookie.split("; ").find((value) => value.startsWith("sz_visitor_id="))?.split("=")[1] ?? "";
-}
-
-function optionalMeasurementAllowed() {
-  return localStorage.getItem("sz_measurement_consent_v2") === "granted";
-}
+import { isTestVisit, measurementConsent, measurementSession, pageAttribution } from "@/lib/visitor-measurement";
 
 export function QuoteForm({ productTitle }: { productTitle?: string }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -25,31 +11,43 @@ export function QuoteForm({ productTitle }: { productTitle?: string }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (status === "sending") return;
     const formElement = event.currentTarget;
     setStatus("sending");
     setMessage("");
 
-    const form = new FormData(formElement);
-    if (productTitle) form.set("brief", `Product of interest: ${productTitle}\n\n${String(form.get("brief") ?? "")}`);
-    const url = new URL(window.location.href);
-    const metaEventId = crypto.randomUUID();
-    const application = String(form.get("application") ?? "");
-    const measurementAllowed = optionalMeasurementAllowed();
-    form.set("pagePath", url.pathname);
-    form.set("referrer", document.referrer);
-    form.set("anonymousId", visitorId());
-    form.set("metaEventId", metaEventId);
-    form.set("metaTrackingAllowed", measurementAllowed ? "yes" : "no");
-    ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"].forEach((key) => form.set(key, url.searchParams.get(key) ?? ""));
-
     try {
+      const form = new FormData(formElement);
+      if (productTitle) form.set("brief", `Product of interest: ${productTitle}\n\n${String(form.get("brief") ?? "")}`);
+      const url = new URL(window.location.href);
+      const session = measurementSession(url);
+      const attribution = session?.attribution ?? pageAttribution(url, document.referrer);
+      const measurementAllowed = measurementConsent() === "granted" && !isTestVisit();
+      const metaEventId = measurementAllowed ? crypto.randomUUID?.() ?? "" : "";
+      const application = String(form.get("application") ?? "");
+      form.set("pagePath", url.pathname);
+      form.set("referrer", attribution.referrer);
+      form.set("anonymousId", session?.anonymousId ?? "");
+      form.set("metaEventId", metaEventId);
+      form.set("metaTrackingAllowed", measurementAllowed && metaEventId ? "yes" : "no");
+      form.set("utm_source", attribution.utmSource);
+      form.set("utm_medium", attribution.utmMedium);
+      form.set("utm_campaign", attribution.utmCampaign);
+      form.set("utm_term", attribution.utmTerm);
+      form.set("utm_content", attribution.utmContent);
+
       const response = await fetch("/api/request-a-quote", { method: "POST", body: form });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message ?? "We could not submit your brief. Please try again.");
-      if (measurementAllowed) trackMetaLead(metaEventId, application);
       setStatus("sent");
-      setMessage(result.message);
+      setMessage(result.message || "Your enquiry has been received.");
       formElement.reset();
+      if (measurementAllowed) {
+        try { window.gtag?.("event", "generate_lead"); } catch {}
+        try {
+          if (metaEventId) window.fbq?.("track", "Lead", { content_name: application || "Fragrance enquiry", content_category: "B2B enquiry" }, { eventID: metaEventId });
+        } catch {}
+      }
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "We could not submit your brief. Please try again.");
@@ -65,13 +63,13 @@ export function QuoteForm({ productTitle }: { productTitle?: string }) {
         <label>Company <span aria-hidden="true">*</span><input required name="company" autoComplete="organization" maxLength={220} placeholder="Your company" /></label>
         <label>Phone / messaging app<input name="phone" autoComplete="tel" maxLength={80} placeholder="Country code + number" /></label>
         <label>Country or region<input name="country" autoComplete="country-name" maxLength={120} placeholder="Where is the project for?" /></label>
-        <label>Application<select name="application" defaultValue="Fine Fragrance"><option>Fine Fragrance</option><option>Candle</option><option>Home Fragrance</option><option>Home & Fabric Care</option><option>Other</option></select></label>
+        <label>Application<select name="application" defaultValue=""><option value="">Select an application</option><option>Fine Fragrance</option><option>Candle</option><option>Home Fragrance</option><option>Home & Fabric Care</option><option>Other</option></select></label>
       </div>
       <label>Project brief <span aria-hidden="true">*</span><textarea required name="brief" minLength={20} maxLength={6000} placeholder="Tell us about the product, target market, scent direction and timing." rows={7} /></label>
       <div className="form-trap" aria-hidden="true"><label>Website<input name="website" tabIndex={-1} autoComplete="off" /></label></div>
       <label className="consent-field"><input required type="checkbox" name="privacyAccepted" value="yes" /> <span>I agree that Sai Zhao may use these details to respond to this project enquiry. See the <Link href="/privacy">privacy notice</Link>.</span></label>
       <div className="form-actions">
-        <button className="button" type="submit" disabled={status === "sending"}>{status === "sending" ? "Sending your brief…" : <>Share Your Brief <ArrowUpRight size={18} /></>}</button>
+        <button className="button" type="submit" disabled={status === "sending"}>{status === "sending" ? "Sending your enquiry…" : <>Send enquiry <ArrowUpRight size={18} /></>}</button>
         <p>Required fields are marked with an asterisk.</p>
       </div>
       <div aria-live="polite" aria-atomic="true">

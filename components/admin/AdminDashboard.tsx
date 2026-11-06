@@ -19,10 +19,12 @@ export function AdminDashboard() {
   const [range, setRange] = useState<AdminDateRangeValue>(() => adminDateRange("90d"));
   const [country, setCountry] = useState("");
   const [source, setSource] = useState("");
+  const [filters, setFilters] = useState({ country: "", source: "" });
   const [data, setData] = useState<Dashboard | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [google, setGoogle] = useState<GoogleReporting | null>(null);
   const [googleState, setGoogleState] = useState<"loading" | "ready" | "error">("loading");
+  const [googleCheckedAt, setGoogleCheckedAt] = useState("");
   const requestId = useRef(0);
   const googleRequestId = useRef(0);
 
@@ -31,8 +33,8 @@ export function AdminDashboard() {
     const id = ++requestId.current;
     setState("loading"); setData(null);
     const query = new URLSearchParams(adminDateQuery(range));
-    if (country.trim()) query.set("country", country.trim());
-    if (source.trim()) query.set("source", source.trim());
+    if (filters.country) query.set("country", filters.country);
+    if (filters.source) query.set("source", filters.source);
     try {
       const response = await fetch(`/api/admin/overview?${query}`, { cache: "no-store" });
       if (id !== requestId.current) return;
@@ -42,7 +44,7 @@ export function AdminDashboard() {
       if (!result.data?.metrics) { setState("error"); return; }
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
-  }, [range, country, source]);
+  }, [range, filters]);
 
   const loadGoogle = useCallback(async () => {
     if (!validAdminDateRange(range)) return;
@@ -54,44 +56,58 @@ export function AdminDashboard() {
       if (!response.ok) { setGoogleState("error"); return; }
       const result = await response.json();
       if (!result.data?.searchConsole || !result.data?.analytics) { setGoogleState("error"); return; }
-      setGoogle(result.data); setGoogleState("ready");
+      setGoogle(result.data);
+      setGoogleCheckedAt(new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }));
+      setGoogleState("ready");
     } catch { if (id === googleRequestId.current) setGoogleState("error"); }
   }, [range]);
 
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   useEffect(() => { const timer = window.setTimeout(() => void loadGoogle(), 0); return () => window.clearTimeout(timer); }, [loadGoogle]);
-  function refresh() { void load(); void loadGoogle(); }
+  function refresh() {
+    const next = { country: country.trim(), source: source.trim() };
+    if (next.country === filters.country && next.source === filters.source) void load();
+    else setFilters(next);
+    void loadGoogle();
+  }
+
+  const rangeParams = new URLSearchParams({ from: range.from, to: range.to, period: range.preset });
+  const visitorParams = new URLSearchParams(rangeParams);
+  if (filters.country) visitorParams.set("country", filters.country);
+  if (filters.source) visitorParams.set("source", filters.source);
+  const visitorsHref = `/admin/visitors?${visitorParams}`;
+  const inquiriesHref = `/admin/inquiries?${rangeParams}`;
 
   const metrics = [
-    { label: "有效访客", value: data?.metrics.visitors, origin: "站内访问记录", icon: UsersThree, href: "/admin/visitors" },
-    { label: "访问会话", value: data?.metrics.sessions, origin: "站内访问记录", icon: ChartLineUp, href: "/admin/visitors" },
-    { label: "页面浏览", value: data?.metrics.pageViews, origin: "站内访问记录", icon: Eye, href: "/admin/visitors" },
-    { label: "新增询盘", value: data?.metrics.leads, origin: "询盘记录", icon: Handshake, href: "/admin/inquiries" },
+    { label: "有效访客", value: data?.metrics.visitors, origin: "站内访问记录", icon: UsersThree, href: visitorsHref },
+    { label: "访问会话", value: data?.metrics.sessions, origin: "站内访问记录", icon: ChartLineUp, href: visitorsHref },
+    { label: "页面浏览", value: data?.metrics.pageViews, origin: "站内访问记录", icon: Eye, href: visitorsHref },
+    { label: "新增询盘", value: data?.metrics.leads, origin: "询盘记录", icon: Handshake, href: inquiriesHref },
   ];
 
   return <AdminShell><section id="main-content" className="admin-content admin-dashboard">
     <header className="admin-header admin-dashboard-hero"><div><h1>业务概览</h1><p className="admin-subtitle">访问与询盘情况</p></div></header>
-    <section className="admin-filters admin-overview-filters" aria-label="数据筛选">
+    <form className="admin-filters admin-overview-filters" aria-label="数据筛选" onSubmit={(event) => { event.preventDefault(); refresh(); }}>
       <AdminDateRange id="overview" value={range} onChange={setRange} />
       <label>国家 / 地区<input value={country} onChange={(event) => setCountry(event.target.value.toUpperCase())} aria-label="筛选国家或地区" /></label>
       <label>来源渠道<input value={source} onChange={(event) => setSource(event.target.value)} aria-label="筛选来源渠道" /></label>
-      <button type="button" onClick={refresh} disabled={!validAdminDateRange(range) || state === "loading"}><ArrowClockwise aria-hidden="true" />更新数据</button>
-    </section>
-    <div className="admin-source-note">指标来源：站内访问记录与询盘记录。仅统计所选时间范围内的数据；Google 数据单独展示。</div>
+      <button type="submit" disabled={!validAdminDateRange(range) || state === "loading"}><ArrowClockwise aria-hidden="true" />应用筛选</button>
+    </form>
+    <div className="admin-source-note">访客统计来自同意网站统计的访问。地区和来源筛选适用于访客数据，询盘按所选日期统计。</div>
     <section className="admin-metrics" aria-label="关键指标">{metrics.map(({ label, value, origin, icon: Icon, href }) => <Link className="admin-metric-card" key={label} href={href}>
       <div className="admin-metric-heading"><span>{label}</span><span className="admin-metric-icon"><Icon weight="regular" aria-hidden="true" /></span></div>
       <strong>{state === "ready" && typeof value === "number" ? value.toLocaleString("zh-CN") : "—"}</strong>
       <small>{state === "ready" ? origin : state === "loading" ? "正在读取" : "暂不可核实"}</small>
     </Link>)}</section>
-    {(state === "setup" || state === "error") && <section className="admin-callout" role="alert"><h2>{state === "setup" ? "数据源暂不可用" : "无法读取业务数据"}</h2><p>当前不能核实指标，请稍后重试。页面不会用默认数字代替真实结果。</p><button className="admin-row-action" type="button" onClick={refresh}>重试</button></section>}
-    {state === "ready" && data && (data.metrics.notificationIssues ?? 0) > 0 && <section className="admin-callout" role="status"><h2>部分询盘邮件通知未送达</h2><p>所选时间内有 {data.metrics.notificationIssues} 条询盘的邮件通知未配置或发送失败。询盘已保存，请在询盘管理中查看并跟进。</p><Link className="admin-row-action" href="/admin/inquiries">查看询盘</Link></section>}
+    {(state === "setup" || state === "error") && <section className="admin-callout" role="alert"><h2>{state === "setup" ? "数据源暂不可用" : "无法读取业务数据"}</h2><p>请稍后重试。</p><button className="admin-row-action" type="button" onClick={refresh}>重试</button></section>}
+    {state === "ready" && data && (data.metrics.notificationIssues ?? 0) > 0 && <section className="admin-callout" role="status"><h2>询盘邮件通知未送达</h2><p>所选时间内有 {data.metrics.notificationIssues} 条询盘已保存，邮件通知未配置或发送失败。</p><Link className="admin-row-action" href={inquiriesHref}>查看询盘</Link></section>}
     {state === "ready" && data && data.metrics.visitors === 0 && data.metrics.leads === 0 && <section className="admin-callout"><h2>所选时间内暂无记录</h2><p>可以调整时间范围，或进入访客中心、询盘管理查看明细。</p><div className="admin-callout-actions"><Link className="admin-row-action" href="/admin/visitors">查看访客</Link><Link className="admin-primary" href="/admin/inquiries">查看询盘</Link></div></section>}
     <section className="admin-grid admin-overview-grid" aria-label="访问分析">
-      <Summary title="主要访问地区" rows={data?.countries ?? []} state={state} icon={GlobeHemisphereWest} href="/admin/visitors" onSelect={setCountry} />
-      <Summary title="访问来源" rows={data?.sources ?? []} state={state} icon={ChartLineUp} href="/admin/visitors" formatLabel={displaySource} onSelect={setSource} />
-      <Summary title="热门页面" rows={data?.pages ?? []} state={state} icon={Path} href="/admin/visitors" />
+      <Summary title="主要访问地区" rows={data?.countries ?? []} state={state} icon={GlobeHemisphereWest} href={visitorsHref} onSelect={(value) => { setCountry(value); setFilters((current) => ({ ...current, country: value })); }} />
+      <Summary title="访问来源" rows={data?.sources ?? []} state={state} icon={ChartLineUp} href={visitorsHref} formatLabel={displaySource} onSelect={(value) => { setSource(value); setFilters((current) => ({ ...current, source: value })); }} />
+      <Summary title="热门页面" rows={data?.pages ?? []} state={state} icon={Path} href={visitorsHref} />
     </section>
-    <GooglePanel data={google} state={googleState} onRefresh={loadGoogle} />
+    <GooglePanel data={google} state={googleState} checkedAt={googleCheckedAt} onRefresh={loadGoogle} />
     <section className="admin-panel admin-module-links"><div><h2>继续处理</h2><p className="admin-panel-subtitle">从汇总进入已有的访客轨迹和询盘记录。</p></div><div><Link className="admin-row-action" href="/admin/visitors">访客中心 <ArrowRight aria-hidden="true" /></Link><Link className="admin-primary" href="/admin/inquiries">询盘管理 <ArrowRight aria-hidden="true" /></Link></div></section>
   </section></AdminShell>;
 }
@@ -103,12 +119,12 @@ function Summary({ title, rows, state, icon: Icon, href, onSelect, formatLabel }
   </section>;
 }
 
-function GooglePanel({ data, state, onRefresh }: { data: GoogleReporting | null; state: "loading" | "ready" | "error"; onRefresh: () => void }) {
+function GooglePanel({ data, state, checkedAt, onRefresh }: { data: GoogleReporting | null; state: "loading" | "ready" | "error"; checkedAt: string; onRefresh: () => void }) {
   const search = data?.searchConsole, analytics = data?.analytics;
   const sectionState = (value: GoogleReporting["searchConsole"]["state"] | undefined) => value === "not_configured" ? "未配置" : value === "not_authorized" ? "未获授权" : value === "unavailable" ? "暂不可读取" : "正在读取";
-  return <section className="admin-panel admin-google-panel"><div className="admin-panel-heading"><div><h2>Google 搜索与网站使用情况</h2><p className="admin-panel-subtitle">Google Search Console 与 GA4，独立于站内统计口径。</p></div><button className="admin-row-action" type="button" onClick={onRefresh} disabled={state === "loading"}>更新数据</button></div>
+  return <section className="admin-panel admin-google-panel"><div className="admin-panel-heading"><div><h2>Google 搜索与网站使用情况</h2><p className="admin-panel-subtitle">{state === "ready" && checkedAt ? `查询时间 ${checkedAt}（北京时间） · 数据以 Google 报表为准` : "数据以 Search Console 和 GA4 报表为准。"}</p></div><button className="admin-row-action" type="button" onClick={onRefresh} disabled={state === "loading"}>更新数据</button></div>
     {state === "error" ? <p className="admin-google-state" role="alert">Google 数据暂时无法读取。</p> : <div className="admin-google-grid">
-      <section className="admin-google-section"><h3>自然搜索 · Search Console</h3>{search?.state === "ready" ? <><div className="admin-google-metrics"><Metric label="点击" value={search.data.totals.clicks} /><Metric label="展示" value={search.data.totals.impressions} /><Metric label="点击率" value={`${(search.data.totals.ctr * 100).toFixed(1)}%`} /><Metric label="平均排名" value={search.data.totals.position.toFixed(1)} /></div><GoogleRows title="热门搜索词" rows={search.data.queries} /><GoogleRows title="热门页面" rows={search.data.pages} /></> : <p className="admin-google-state">{sectionState(search?.state)}</p>}</section>
+      <section className="admin-google-section"><h3>自然搜索 · Search Console</h3>{search?.state === "ready" ? <><div className="admin-google-metrics"><Metric label="点击" value={search.data.totals.clicks} /><Metric label="展示" value={search.data.totals.impressions} /><Metric label="点击率" value={search.data.totals.impressions ? `${(search.data.totals.ctr * 100).toFixed(1)}%` : "—"} /><Metric label="平均排名" value={search.data.totals.impressions ? search.data.totals.position.toFixed(1) : "—"} /></div><GoogleRows title="热门搜索词" rows={search.data.queries} /><GoogleRows title="热门页面" rows={search.data.pages} /></> : <p className="admin-google-state">{sectionState(search?.state)}</p>}</section>
       <section className="admin-google-section"><h3>网站使用情况 · GA4</h3>{analytics?.state === "ready" ? <div className="admin-google-metrics admin-google-metrics-four"><Metric label="活跃用户" value={analytics.data.users} /><Metric label="会话" value={analytics.data.sessions} /><Metric label="页面浏览" value={analytics.data.pageViews} /><Metric label="关键事件" value={analytics.data.keyEvents} /></div> : <p className="admin-google-state">{sectionState(analytics?.state)}</p>}</section>
     </div>}
   </section>;

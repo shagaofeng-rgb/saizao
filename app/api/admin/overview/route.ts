@@ -13,17 +13,20 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const now = new Date();
-  const days = Math.min(Math.max(Number(params.get("days") ?? "7"), 1), 366);
+  const days = Math.min(Math.max(Math.trunc(Number(params.get("days"))) || 7, 1), 366);
   const startFallback = new Date(now.getTime() - (days - 1) * 86400000);
   const result = await rpc<Record<string, unknown>>("admin_dashboard", {
     p_start: iso(params.get("from"), startFallback),
     p_end: iso(params.get("to"), now),
-    p_country: params.get("country") || null,
-    p_source: params.get("source") || null,
-    p_page: Math.max(Number(params.get("page") ?? "1"), 1),
-    p_page_size: Math.min(Math.max(Number(params.get("pageSize") ?? "25"), 25), 100),
+    p_country: params.get("country")?.trim().slice(0, 8) || null,
+    p_source: params.get("source")?.trim().slice(0, 160) || null,
+    p_page: Math.min(Math.max(Math.trunc(Number(params.get("page"))) || 1, 1), 10000),
+    p_page_size: Math.min(Math.max(Math.trunc(Number(params.get("pageSize"))) || 25, 25), 100),
   }).catch(() => null);
 
   if (!result) return NextResponse.json({ message: "Unable to load analytics data." }, { status: 503 });
-  return NextResponse.json({ configured: true, data: result });
+  const { metrics, countries, sources, pages } = result;
+  return NextResponse.json({ configured: true, data: { metrics, countries, sources, pages } }, {
+    headers: { "cache-control": "private, no-store" },
+  });
 }

@@ -77,7 +77,10 @@ export async function PATCH(request:Request,{params}:{params:Promise<{kind:strin
   const session=await getAdminSession(); const table=await tableFrom(params);
   if(!session||!table||!canManageContent(session.role)) return NextResponse.json({message:"Unauthorized"},{status:401});
   if(!isSameOrigin(request)||requestBodyTooLarge(request,250000)) return NextResponse.json({message:"请求校验失败。"},{status:400});
-  const body=await request.json().catch(()=>({})); if(typeof body.id!=="string") return NextResponse.json({message:"缺少内容编号。"},{status:400});
+  const body = await request.json().catch(() => null);
+  if (!body || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(body.id || ""))) {
+    return NextResponse.json({ message: "内容编号无效。" }, { status: 400 });
+  }
   const status=["draft","review","published","archived"].includes(body.status)?body.status:null;
   if(!status) return NextResponse.json({message:"无效状态。"},{status:400});
   if (table === "products" && status === "published") return NextResponse.json({ message: "请进入产品详情完成发布检查。" }, { status: 400 });

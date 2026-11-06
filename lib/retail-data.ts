@@ -1,23 +1,23 @@
 import "server-only";
+import { cache } from "react";
 import { isSupabaseConfigured, rest } from "@/lib/supabase-server";
 import { normalizeDetail, type RetailProduct, type RetailVariant } from "@/lib/retail-types";
 
-const productSelect = "id,title,slug,subtitle,badge,summary,content,application,category_id,cover_url,hero_url,gallery,detail,attachment_url,seo_title,seo_description,status,retail_enabled,is_demo,content_categories(name,slug,is_enabled,show_in_nav,deleted_at)";
+const productSelect = "id,title,slug,subtitle,badge,summary,content,application,category_id,cover_url,hero_url,gallery,detail,attachment_url,seo_title,seo_description,status,retail_enabled,is_demo,source_provider,content_categories(name,slug,is_enabled,show_in_nav,deleted_at)";
 
 export type ProductCategory = { id: string; name: string; slug: string; parent_id: string | null; sort_order: number; is_enabled?: boolean; show_in_nav?: boolean; deleted_at?: string | null };
 export type CatalogResult = { items: RetailProduct[]; total: number; page: number; unavailable: boolean };
-const catalogPageSize = 12;
+export const catalogPageSize = 12;
 
 type ProductRow = Omit<RetailProduct, "detail" | "variants"> & { detail: unknown; gallery: unknown };
 
-async function hydrateProducts(rows: ProductRow[]): Promise<RetailProduct[]> {
-  if (!rows.length) return [];
-  const ids = rows.map((row) => row.id);
-  const response = await rest<RetailVariant[]>(
+async function hydrateProducts(rows: ProductRow[], includeDisabled = false): Promise<RetailProduct[]> {
+  const ids = rows.filter((row) => includeDisabled || row.retail_enabled).map((row) => row.id);
+  const response = ids.length ? await rest<RetailVariant[]>(
     `retail_variants?select=*&product_id=in.(${ids.join(",")})&order=sort_order.asc`,
-  );
+  ) : null;
   const variants = new Map<string, RetailVariant[]>();
-  for (const variant of response.data) {
+  for (const variant of response?.data ?? []) {
     const group = variants.get(variant.product_id) ?? [];
     group.push(variant);
     variants.set(variant.product_id, group);
@@ -30,23 +30,21 @@ async function hydrateProducts(rows: ProductRow[]): Promise<RetailProduct[]> {
   }));
 }
 
-export async function getRetailProductBySlug(slug: string) {
+export const getRetailProductBySlug = cache(async (slug: string) => {
   if (!/^[a-z0-9-]{1,120}$/.test(slug) || !isSupabaseConfigured()) return null;
-  try {
-    const response = await rest<ProductRow[]>(
-      `products?select=${productSelect}&slug=eq.${slug}&status=eq.published&is_demo=eq.false&limit=1`,
-    );
-    return response.data[0] ? (await hydrateProducts(response.data))[0] : null;
-  } catch { return null; }
-}
+  const response = await rest<ProductRow[]>(
+    `products?select=${productSelect}&slug=eq.${slug}&status=eq.published&is_demo=eq.false&limit=1`,
+  );
+  return response.data[0] ? (await hydrateProducts(response.data))[0] : null;
+});
 
 export async function getRetailProductForAdmin(id: string) {
   if (!/^[0-9a-f-]{36}$/.test(id) || !isSupabaseConfigured()) return null;
   try {
     const response = await rest<ProductRow[]>(
-      `products?select=${productSelect},source_provider,source_id,source_url,source_synced_at&id=eq.${id}&limit=1`,
+      `products?select=${productSelect},source_id,source_url,source_synced_at&id=eq.${id}&limit=1`,
     );
-    return response.data[0] ? (await hydrateProducts(response.data))[0] : null;
+    return response.data[0] ? (await hydrateProducts(response.data, true))[0] : null;
   } catch { return null; }
 }
 
@@ -57,7 +55,7 @@ export async function getRelatedRetailProducts(slugs: string[], excludeId: strin
     const response = await rest<ProductRow[]>(
       `products?select=${productSelect}&slug=in.(${values.join(",")})&status=eq.published&is_demo=eq.false&limit=4`,
     );
-    return hydrateProducts(response.data.filter((row) => row.id !== excludeId));
+    return await hydrateProducts(response.data.filter((row) => row.id !== excludeId));
   } catch { return [] as RetailProduct[]; }
 }
 
@@ -102,15 +100,13 @@ export async function getRetailCatalogPage({ query = "", category = "", page = 1
   } catch { return { items: [], total: 0, page: requestedPage, unavailable: true }; }
 }
 
-export async function getPublishedRetailProductSlugs(): Promise<string[]> {
+export async function getPublishedRetailProductEntries() {
   if (!isSupabaseConfigured()) return [];
-  try {
-    const slugs: string[] = [];
-    for (let offset = 0; ; offset += 500) {
-      const response = await rest<{ slug: string }[]>(`products?select=slug&status=eq.published&is_demo=eq.false&order=published_at.desc&limit=500&offset=${offset}`);
-      slugs.push(...response.data.map((row) => row.slug));
-      if (response.data.length < 500) break;
-    }
-    return slugs;
-  } catch { return []; }
+  type ProductEntry = { slug: string; published_at: string | null; updated_at: string | null };
+  const products: ProductEntry[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data } = await rest<ProductEntry[]>(`products?select=slug,published_at,updated_at&status=eq.published&is_demo=eq.false&order=published_at.desc,id.desc&limit=500&offset=${offset}`);
+    products.push(...data);
+    if (data.length < 500) return products;
+  }
 }

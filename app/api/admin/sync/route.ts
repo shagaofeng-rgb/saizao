@@ -22,16 +22,18 @@ export async function POST(request: Request) {
   const session = await getAdminSession();
   if (!session || !canManageStaff(session.role)) return NextResponse.json({ message: "只有管理员可以运行核验。" }, { status: 403 });
   if (!isSameOrigin(request) || requestBodyTooLarge(request, 2000)) return NextResponse.json({ message: "请求校验失败。" }, { status: 400 });
-  const body = await request.json().catch(() => ({}));
-  const period = { preset: "custom" as const, from: String(body.from || ""), to: String(body.to || "") };
+  const body = await request.json().catch(() => null);
+  const period = { preset: "custom" as const, from: String(body?.from || ""), to: String(body?.to || "") };
   if (!validAdminDateRange(period)) return NextResponse.json({ message: "请选择有效的时间范围。" }, { status: 400 });
   const start = new Date(`${period.from}T00:00:00Z`), end = new Date(`${period.to}T00:00:00Z`);
   if ((end.getTime() - start.getTime()) / 86400000 > 365) return NextResponse.json({ message: "每次最多核验 366 天。" }, { status: 400 });
   const jobKey = randomUUID();
+  let runId: string | undefined;
   try {
     const saved = await rest<Run[]>("integration_sync_runs", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ source: "google", job_key: jobKey, status: "running", period_from: period.from, period_to: period.to, triggered_by: session.accountId }) });
     const id = saved.data[0]?.id;
     if (!id) throw new Error("run not saved");
+    runId = id;
     const report = await getGoogleReporting(period.from, period.to);
     const states = [report.searchConsole.state, report.analytics.state];
     const status = states.every((value) => value === "ready") ? "completed" : states.some((value) => value === "ready") ? "partial" : "failed";
@@ -39,5 +41,11 @@ export async function POST(request: Request) {
     await rest(`integration_sync_runs?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status, finished_at: new Date().toISOString(), result, error_code: status === "failed" ? states.join("+") : null }) });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "google_report_checked", p_entity_type: "integration_sync_runs", p_entity_id: id, p_metadata: { status, from: period.from, to: period.to } }).catch(() => undefined);
     return NextResponse.json({ status, result });
-  } catch { return NextResponse.json({ message: "核验任务未能完成，请稍后重试。" }, { status: 503 }); }
+  } catch {
+    if (runId) await rest(`integration_sync_runs?id=eq.${runId}&status=eq.running`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "failed", finished_at: new Date().toISOString(), error_code: "verification_unavailable" }),
+    }).catch(() => undefined);
+    return NextResponse.json({ message: "核验任务未能完成，请稍后重试。" }, { status: 503 });
+  }
 }

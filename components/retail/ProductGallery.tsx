@@ -28,7 +28,7 @@ export function ProductGallery({ images, title }: { images: ProductImage[]; titl
         src={active.url}
         alt={active.alt || title}
         fill
-        priority={activeIndex === 0}
+        preload={activeIndex === 0}
         unoptimized={process.env.NODE_ENV === "development"}
         sizes="(max-width: 900px) 100vw, 48vw"
       />

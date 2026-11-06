@@ -23,15 +23,12 @@ export const publishedArticles=()=>list("articles");
 
 export async function publishedArticleSlugs(): Promise<{ slug: string; published_at: string | null; updated_at: string | null }[]> {
   if (!isSupabaseConfigured()) return [];
-  try {
-    const articles: { slug: string; published_at: string | null; updated_at: string | null }[] = [];
-    for (let offset = 0; ; offset += 500) {
-      const page = (await rest<{ slug: string; published_at: string | null; updated_at: string | null }[]>(`articles?select=slug,published_at,updated_at&status=eq.published&order=published_at.desc&limit=500&offset=${offset}`)).data;
-      articles.push(...page);
-      if (page.length < 500) break;
-    }
-    return articles;
-  } catch { return []; }
+  const articles: { slug: string; published_at: string | null; updated_at: string | null }[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = (await rest<{ slug: string; published_at: string | null; updated_at: string | null }[]>(`articles?select=slug,published_at,updated_at&status=eq.published&order=published_at.desc,id.desc&limit=500&offset=${offset}`)).data;
+    articles.push(...page);
+    if (page.length < 500) return articles;
+  }
 }
 
 async function one(table:"products"|"articles", slug:string) {

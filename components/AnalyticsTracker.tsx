@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isTestVisit, measurementConsent, measurementSession, setMeasurementConsent } from "@/lib/visitor-measurement";
 
-const visitorCookie = "sz_visitor_id";
-const sessionKey = "sz_session_id";
-const consentKey = "sz_measurement_consent_v2";
 type Consent = "granted" | "denied" | null;
 const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
 const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
@@ -27,31 +25,6 @@ declare global {
     dataLayer?: unknown[];
     gtag?: GoogleTag;
   }
-}
-
-function id(prefix: string) {
-  return `${prefix}_${crypto.randomUUID()}`;
-}
-
-function readCookie(name: string) {
-  return document.cookie.split("; ").find((value) => value.startsWith(`${name}=`))?.split("=")[1];
-}
-
-function visitorId() {
-  const current = readCookie(visitorCookie);
-  if (current) return current;
-  const next = id("v");
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${visitorCookie}=${next}; Path=/; Max-Age=34128000; SameSite=Lax${secure}`;
-  return next;
-}
-
-function sessionId() {
-  const current = sessionStorage.getItem(sessionKey);
-  if (current) return current;
-  const next = id("s");
-  sessionStorage.setItem(sessionKey, next);
-  return next;
 }
 
 function loadMetaPixel(onReady: () => void) {
@@ -101,7 +74,9 @@ function loadGoogleAnalytics(onReady: () => void) {
   const initialize = () => {
     if (document.documentElement.dataset.googleAnalyticsReady === "true") return;
     window.dataLayer = window.dataLayer || [];
-    window.gtag = (...args: unknown[]) => window.dataLayer?.push(args);
+    // gtag.js reads commands from the Arguments objects in this queue.
+    // eslint-disable-next-line prefer-rest-params
+    window.gtag = function () { window.dataLayer?.push(arguments); };
     window.gtag("js", new Date());
     window.gtag("config", googleAnalyticsId, { send_page_view: false });
     document.documentElement.dataset.googleAnalyticsReady = "true";
@@ -130,31 +105,26 @@ export function AnalyticsTracker() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      const saved = localStorage.getItem(consentKey);
-      setConsent(saved === "granted" || saved === "denied" ? saved : navigator.doNotTrack === "1" ? "denied" : null);
+      setConsent(measurementConsent() ?? (navigator.doNotTrack === "1" ? "denied" : null));
     }, 0);
     return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
     if (consent !== "granted" || !pathname || pathname.startsWith("/admin")) return;
+    const session = measurementSession();
+    if (!session) return;
     const timeout = window.setTimeout(() => {
-      const query = new URLSearchParams(window.location.search);
       fetch("/api/analytics/collect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          anonymousId: visitorId(),
-          sessionId: sessionId(),
+          anonymousId: session.anonymousId,
+          sessionId: session.sessionId,
           path: pathname,
           title: document.title,
-          referrer: document.referrer || null,
-          utmSource: query.get("utm_source"),
-          utmMedium: query.get("utm_medium"),
-          utmCampaign: query.get("utm_campaign"),
-          utmTerm: query.get("utm_term"),
-          utmContent: query.get("utm_content"),
-          isTest: query.get("traffic_mode") === "test",
+          ...session.attribution,
+          isTest: session.isTest,
         }),
         keepalive: true,
       }).catch(() => undefined);
@@ -163,26 +133,32 @@ export function AnalyticsTracker() {
   }, [consent, pathname]);
 
   useEffect(() => {
-    if (consent !== "granted" || !pathname || pathname.startsWith("/admin")) return;
+    if (consent !== "granted" || !pathname || pathname.startsWith("/admin") || isTestVisit()) return;
     loadMetaPixel(() => setPixelReady(true));
   }, [consent, pathname]);
 
   useEffect(() => {
-    if (consent !== "granted" || !pathname || pathname.startsWith("/admin")) return;
+    if (consent !== "granted" || !pathname || pathname.startsWith("/admin") || isTestVisit()) return;
     loadGoogleAnalytics(() => setGoogleAnalyticsReady(true));
   }, [consent, pathname]);
 
   useEffect(() => {
-    if (!googleAnalyticsReady || !pathname || pathname.startsWith("/admin")) return;
+    if (consent !== "granted" || !googleAnalyticsReady || !pathname || pathname.startsWith("/admin") || isTestVisit()) return;
+    const location = new URL(pathname, window.location.origin);
+    const query = new URLSearchParams(window.location.search);
+    for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "dclid", "gbraid", "wbraid"]) {
+      const value = query.get(key);
+      if (value) location.searchParams.set(key, value);
+    }
     window.gtag?.("event", "page_view", {
       page_path: pathname,
-      page_location: window.location.href,
+      page_location: location.href,
       page_title: document.title,
     });
-  }, [googleAnalyticsReady, pathname]);
+  }, [consent, googleAnalyticsReady, pathname]);
 
   useEffect(() => {
-    if (!pixelReady || !pathname || pathname.startsWith("/admin")) return;
+    if (consent !== "granted" || !pixelReady || !pathname || pathname.startsWith("/admin") || isTestVisit()) return;
     window.fbq?.("track", "PageView");
     if (pathname.startsWith("/products/") || pathname.startsWith("/applications/")) {
       window.fbq?.("track", "ViewContent", {
@@ -190,11 +166,12 @@ export function AnalyticsTracker() {
         content_category: pathname.startsWith("/products/") ? "Product" : "Application",
       });
     }
-  }, [pixelReady, pathname]);
+  }, [consent, pixelReady, pathname]);
 
   useEffect(() => {
-    if (!pixelReady && !googleAnalyticsReady) return;
+    if (consent !== "granted" || (!pixelReady && !googleAnalyticsReady) || pathname.startsWith("/admin")) return;
     const trackContact = (event: MouseEvent) => {
+      if (isTestVisit()) return;
       const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
       const href = target?.getAttribute("href")?.toLowerCase() ?? "";
       if (!href.startsWith("tel:") && !href.startsWith("mailto:") && !href.includes("wa.me") && !href.includes("whatsapp")) return;
@@ -204,10 +181,10 @@ export function AnalyticsTracker() {
     };
     document.addEventListener("click", trackContact);
     return () => document.removeEventListener("click", trackContact);
-  }, [pixelReady, googleAnalyticsReady]);
+  }, [consent, pathname, pixelReady, googleAnalyticsReady]);
 
   function choose(value: Exclude<Consent, null>) {
-    localStorage.setItem(consentKey, value);
+    setMeasurementConsent(value);
     setConsent(value);
   }
 
