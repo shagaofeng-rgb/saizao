@@ -1,0 +1,29 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, useState } from "react";
+
+export function AdminLoginForm() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSending(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const result = await response.json();
+      if (response.ok) window.location.replace(result.mustChangePassword ? "/admin/change-password" : "/admin");
+      else { setMessage(result.message ?? "登录失败，请重试。"); setSending(false); }
+    } catch { setMessage("登录服务暂时无法连接，请重试。"); setSending(false); }
+  }
+
+  return <main id="main-content" className="admin-login"><form onSubmit={submit}><div className="admin-auth-brand">赛兆</div><h1>业务中心</h1><p className="admin-auth-description">查看访客、询盘与内容信息。</p><label>登录邮箱<input autoFocus type="email" autoComplete="email" value={username} onChange={(event) => setUsername(event.target.value)} required /></label><label>登录密码<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label><button type="submit" disabled={sending}>{sending ? "正在登录…" : "登录"}</button><div aria-live="polite">{message && <p className="admin-error">{message}</p>}</div><Link className="admin-auth-link" href="/admin/forgot-password">忘记密码</Link></form></main>;
+}

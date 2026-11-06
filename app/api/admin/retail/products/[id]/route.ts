@@ -68,8 +68,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   const payload = { title, slug, category_id, subtitle: text(body.subtitle, 240) || null, badge: text(body.badge, 80) || null, summary, content, cover_url, hero_url: safeUrl(body.hero_url) || null, gallery, detail, retail_enabled: Boolean(body.retail_enabled), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, status, updated_by: session.accountId };
   try {
-    const saved = await rpc<Record<string, unknown>>("admin_save_retail_product", { p_product_id: id, p_payload: payload, p_variants: cleaned });
+    const saved = await rpc<{ data?: Record<string, unknown>; conflict?: boolean }>("admin_save_retail_product_if_current", { p_product_id: id, p_expected_status: existing.status, p_payload: payload, p_variants: cleaned });
+    if (saved.conflict) return NextResponse.json({ message: "产品状态已变化，请刷新后重试。" }, { status: 409 });
+    if (!saved.data) return NextResponse.json({ message: "未能保存产品，请稍后重试。" }, { status: 503 });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "retail_product_updated", p_entity_type: "products", p_entity_id: id, p_metadata: { status, variantCount: cleaned.length } }).catch(() => undefined);
-    return NextResponse.json({ ok: true, data: saved });
+    return NextResponse.json({ ok: true, data: saved.data });
   } catch { return NextResponse.json({ message: "保存失败，请检查 SKU 是否重复，以及库存是否低于已预留数量。" }, { status: 400 }); }
 }

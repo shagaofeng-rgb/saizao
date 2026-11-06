@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { useAdminSearch } from "@/components/admin/useAdminSearch";
 
 type Item = {
   id: string;
@@ -29,16 +30,18 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
   const [pageSize, setPageSize] = useState(10);
   const [message, setMessage] = useState("");
   const [readState, setReadState] = useState<"loading" | "ready" | "error">("loading");
-  const [query, setQuery] = useState("");
+  const { draft: titleFilter, setDraft: setTitleFilter, query } = useAdminSearch(setPage);
   const [statusFilter, setStatusFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const requestId = useRef(0);
   const [form, setForm] = useState({ title: "", slug: "", categoryId: "", summary: "", application: "", articleType: "news", content: "", seoTitle: "", seoDescription: "", focusKeywords: "", coverAlt: "", status: "draft", coverUrl: "", attachmentUrl: "" });
 
   useEffect(() => { if (kind !== "articles" || !canEdit) return; let live = true; fetch("/api/admin/categories?kind=article&pageSize=100", { cache: "no-store" }).then((response) => response.json()).then((result) => { if (live && Array.isArray(result.data)) setCategories(result.data.filter((item: { is_enabled: boolean }) => item.is_enabled)); }).catch(() => undefined); return () => { live = false; }; }, [kind, canEdit]);
 
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setReadState("loading"); setItems([]); setTotal(0);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (query.trim()) params.set("q", query.trim());
@@ -46,9 +49,10 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
     try {
       const response = await fetch(`/api/admin/content/${kind}?${params}`, { cache: "no-store" });
       const result = await response.json();
+      if (id !== requestId.current) return;
       if (!response.ok || !Array.isArray(result.data)) { setReadState("error"); return; }
       setItems(result.data); setTotal(result.total); setReadState("ready");
-    } catch { setReadState("error"); }
+    } catch { if (id === requestId.current) setReadState("error"); }
   }, [kind, page, pageSize, query, statusFilter]);
 
   useEffect(() => {
@@ -137,7 +141,7 @@ export function ContentManager({ kind, canEdit, canPublish }: { kind: "products"
       </form>}
       <section className="admin-panel admin-list-panel">
         <div className="admin-panel-heading"><h2>{label}列表</h2><label>每页<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10 条</option><option value={20}>20 条</option><option value={50}>50 条</option><option value={100}>100 条</option></select></label></div>
-        <div className="admin-list-filters"><label>搜索标题<input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label><label>发布状态<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">全部状态</option>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></label></div>
+        <div className="admin-list-filters"><label>搜索标题<input value={titleFilter} onChange={(event) => setTitleFilter(event.target.value)} /></label><label>发布状态<select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">{kind === "products" ? "未归档" : "全部状态"}</option>{statuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></label></div>
         {kind === "products" && message && <p role="status" className="admin-feedback">{message}</p>}
         {deleteItem && <section className="admin-feedback" role="alert" aria-label="确认删除内容"><p>确认删除“{deleteItem.title}”？删除后会从前台下架，记录和历史订单保留，可在已归档中恢复。</p><div className="admin-row-actions"><button type="button" className="admin-row-action" disabled={busy} onClick={() => void removeItem()}>{busy ? "正在删除…" : "确认删除"}</button><button type="button" className="admin-row-action" disabled={busy} onClick={() => setDeleteItem(null)}>取消</button></div></section>}
         <div className="admin-table-scroll"><table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>最后更新</th><th>操作</th></tr></thead><tbody>

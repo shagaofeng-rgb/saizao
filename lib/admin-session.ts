@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { rpc } from "@/lib/supabase-server";
 
 const cookieName = "sz_admin_session";
@@ -28,7 +29,7 @@ function parse(value?: string): StoredSession | null {
     return decoded as StoredSession;
   } catch { return null; }
 }
-export async function getAdminSession(): Promise<AdminSession | null> {
+export const getAdminPasswordSession = cache(async (): Promise<AdminSession | null> => {
   try {
     const base = parse((await cookies()).get(cookieName)?.value);
     if (!base) return null;
@@ -36,6 +37,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     if (!account?.is_active || account.session_version !== base.version) return null;
     return {...base, role:account.role, email:account.email, displayName:account.display_name, forcePasswordReset:account.force_password_reset};
   } catch { return null; }
+});
+export async function getAdminSession(): Promise<AdminSession | null> {
+  const session = await getAdminPasswordSession();
+  return session?.forcePasswordReset ? null : session;
 }
 export async function hasAdminSession() { return Boolean(await getAdminSession()); }
 export function canManageStaff(role: AdminRole) { return role === "super_admin" || role === "admin"; }

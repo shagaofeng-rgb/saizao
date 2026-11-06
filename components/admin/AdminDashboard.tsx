@@ -41,6 +41,7 @@ export function AdminDashboard() {
       if (response.status === 503) { setState("setup"); return; }
       if (!response.ok) { setState("error"); return; }
       const result = await response.json();
+      if (id !== requestId.current) return;
       if (!result.data?.metrics) { setState("error"); return; }
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
@@ -55,6 +56,7 @@ export function AdminDashboard() {
       if (id !== googleRequestId.current) return;
       if (!response.ok) { setGoogleState("error"); return; }
       const result = await response.json();
+      if (id !== googleRequestId.current) return;
       if (!result.data?.searchConsole || !result.data?.analytics) { setGoogleState("error"); return; }
       setGoogle(result.data);
       setGoogleCheckedAt(new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }));
@@ -68,7 +70,6 @@ export function AdminDashboard() {
     const next = { country: country.trim(), source: source.trim() };
     if (next.country === filters.country && next.source === filters.source) void load();
     else setFilters(next);
-    void loadGoogle();
   }
 
   const rangeParams = new URLSearchParams({ from: range.from, to: range.to, period: range.preset });

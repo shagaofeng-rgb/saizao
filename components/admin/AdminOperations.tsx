@@ -46,15 +46,16 @@ export function VisitorCenter() {
   const [range, setRange] = useState<AdminDateRangeValue>(() => adminRangeFromSearch(search));
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20);
   const [q, setQ] = useState(""), [country, setCountry] = useState(search.get("country") ?? ""), [sourceValue, setSource] = useState(search.get("source") ?? "");
+  const [filters, setFilters] = useState(() => ({ q: "", country: search.get("country") ?? "", source: search.get("source") ?? "" }));
   const requestId = useRef(0);
   const load = useCallback(async () => {
     if (!validAdminDateRange(range)) return;
     const id = ++requestId.current;
     setState("loading"); setData(null);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), ...adminDateQuery(range) });
-    if (q.trim()) params.set("q", q.trim());
-    if (country.trim()) params.set("country", country.trim());
-    if (sourceValue.trim()) params.set("source", sourceValue.trim());
+    if (filters.q) params.set("q", filters.q);
+    if (filters.country) params.set("country", filters.country);
+    if (filters.source) params.set("source", filters.source);
     try {
       const response = await fetch(`/api/admin/visitors?${params}`, { cache: "no-store" });
       const result = await response.json();
@@ -62,11 +63,11 @@ export function VisitorCenter() {
       if (!response.ok || !Array.isArray(result.data?.items)) { setState("error"); return; }
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
-  }, [range, page, pageSize, q, country, sourceValue]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 220); return () => window.clearTimeout(timer); }, [load]);
+  }, [range, page, pageSize, filters]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>访客中心</h1><p className="admin-subtitle">查看已记录的有效访问与页面轨迹。</p></div></header>
-    <section className="admin-filters" aria-label="访客筛选"><AdminDateRange id="visitors" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="访客标识或脱敏 IP" /></label><label>国家 / 地区<input value={country} onChange={(event) => { setCountry(event.target.value.toUpperCase()); setPage(1); }} /></label><label>来源渠道<input value={sourceValue} onChange={(event) => { setSource(event.target.value); setPage(1); }} /></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><Funnel aria-hidden="true" />查询</button></section>
+    <form className="admin-filters" aria-label="访客筛选" onSubmit={(event) => { event.preventDefault(); setPage(1); setFilters({ q: q.trim(), country: country.trim(), source: sourceValue.trim() }); }}><AdminDateRange id="visitors" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => setQ(event.target.value)} placeholder="访客标识或脱敏 IP" /></label><label>国家 / 地区<input value={country} onChange={(event) => setCountry(event.target.value.toUpperCase())} /></label><label>来源渠道<input value={sourceValue} onChange={(event) => setSource(event.target.value)} /></label><button type="submit" disabled={!validAdminDateRange(range) || state === "loading"}><Funnel aria-hidden="true" />查询</button></form>
     <section className="admin-panel"><div className="admin-panel-heading"><div><h2>访客记录</h2><p className="admin-panel-subtitle">来源：站内访问记录。按匿名访客汇总，不显示完整 IP。</p></div></div>
       <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="访客记录表"><table><thead><tr><th>国家/地区</th><th>来源</th><th>会话</th><th>首次进入页面</th><th>最近访问（北京时间）</th><th>操作</th></tr></thead><tbody>
         {state === "loading" ? <tr><td colSpan={6} className="admin-empty">正在读取访客记录…</td></tr> : state === "error" ? <tr><td colSpan={6} className="admin-empty" role="alert">无法读取访客记录，请重试。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td>{item.country}</td><td>{source(item.latestSource)}</td><td>{item.sessionCount}</td><td className="admin-path">{item.firstLandingPage || "—"}</td><td>{beijingDateTime(item.lastSeenAt)}</td><td><Link className="admin-row-action" href={`/admin/visitors/${item.id}`}><Eye aria-hidden="true" />查看详情</Link></td></tr>) : <tr><td colSpan={6} className="admin-empty">所选条件下暂无访客记录</td></tr>}
@@ -80,14 +81,14 @@ export function InquiryCenter({ canExport }: { canExport: boolean }) {
   const [state, setState] = useState<State>("loading");
   const [range, setRange] = useState<AdminDateRangeValue>(() => adminRangeFromSearch(search));
   const [page, setPage] = useState(1), [pageSize, setPageSize] = useState(20);
-  const [q, setQ] = useState(""), [statusValue, setStatus] = useState("");
+  const [q, setQ] = useState(""), [appliedQ, setAppliedQ] = useState({ value: "" }), [statusValue, setStatus] = useState("");
   const requestId = useRef(0);
   const load = useCallback(async () => {
     if (!validAdminDateRange(range)) return;
     const id = ++requestId.current;
     setState("loading"); setData(null);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), ...adminDateQuery(range) });
-    if (q.trim()) params.set("q", q.trim());
+    if (appliedQ.value) params.set("q", appliedQ.value);
     if (statusValue) params.set("status", statusValue);
     try {
       const response = await fetch(`/api/admin/inquiries?${params}`, { cache: "no-store" });
@@ -96,12 +97,12 @@ export function InquiryCenter({ canExport }: { canExport: boolean }) {
       if (!response.ok || !Array.isArray(result.data?.items)) { setState("error"); return; }
       setData(result.data); setState("ready");
     } catch { if (id === requestId.current) setState("error"); }
-  }, [range, page, pageSize, q, statusValue]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 220); return () => window.clearTimeout(timer); }, [load]);
-  const exportParams = new URLSearchParams({ ...adminDateQuery(range), q: q.trim(), status: statusValue });
+  }, [range, page, pageSize, appliedQ, statusValue]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+  const exportParams = validAdminDateRange(range) && state === "ready" ? new URLSearchParams({ ...adminDateQuery(range), q: appliedQ.value, status: statusValue }) : null;
 
-  return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>询盘管理</h1><p className="admin-subtitle">查看客户需求，并跟进关联的访问轨迹。</p></div>{canExport && <a className="admin-row-action" href={`/api/admin/inquiries/export?${exportParams}`} download>导出当前筛选结果</a>}</header>
-    <section className="admin-filters" aria-label="询盘筛选"><AdminDateRange id="inquiries" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => { setQ(event.target.value); setPage(1); }} placeholder="姓名、公司或邮箱" /></label><label>处理状态<select value={statusValue} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">全部状态</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button type="button" onClick={() => void load()} disabled={!validAdminDateRange(range) || state === "loading"}><MagnifyingGlass aria-hidden="true" />查询</button></section>
+  return <AdminShell><section id="main-content" className="admin-content admin-content-wide"><header className="admin-header"><div><h1>询盘管理</h1><p className="admin-subtitle">查看客户需求，并跟进关联的访问轨迹。</p></div>{canExport && exportParams && <a className="admin-row-action" href={`/api/admin/inquiries/export?${exportParams}`} download>导出当前筛选结果</a>}</header>
+    <form className="admin-filters" aria-label="询盘筛选" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedQ({ value: q.trim() }); }}><AdminDateRange id="inquiries" value={range} onChange={(value) => { setRange(value); setPage(1); }} /><label>关键词<input value={q} onChange={(event) => setQ(event.target.value)} placeholder="姓名、公司或邮箱" /></label><label>处理状态<select value={statusValue} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">全部状态</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button type="submit" disabled={!validAdminDateRange(range) || state === "loading"}><MagnifyingGlass aria-hidden="true" />查询</button></form>
     <section className="admin-panel"><div className="admin-panel-heading"><div><h2>询盘记录</h2><p className="admin-panel-subtitle">已保存的客户询盘。</p></div></div><div className="admin-table-scroll" tabIndex={0} role="region" aria-label="询盘记录表"><table><thead><tr><th>客户</th><th>公司</th><th>国家/地区</th><th>产品应用</th><th>来源</th><th>提交时间（北京时间）</th><th>状态</th><th>操作</th></tr></thead><tbody>
       {state === "loading" ? <tr><td colSpan={8} className="admin-empty">正在读取询盘…</td></tr> : state === "error" ? <tr><td colSpan={8} className="admin-empty" role="alert">无法读取询盘，请重试。</td></tr> : data?.items.length ? data.items.map((item) => <tr key={item.id}><td><b>{item.name}</b><small>{item.email}</small></td><td>{item.company}</td><td>{item.country}</td><td>{item.application || "—"}</td><td>{source(item.source)}</td><td>{beijingDateTime(item.createdAt)}</td><td><span className="admin-tag">{status(item.status)}</span></td><td><Link className="admin-row-action" href={`/admin/inquiries/${item.id}`}>查看详情</Link></td></tr>) : <tr><td colSpan={8} className="admin-empty">所选条件下暂无询盘</td></tr>}
     </tbody></table></div>{state === "error" && <button className="admin-row-action" type="button" onClick={() => void load()}>重试</button>}{state === "ready" && data && <Pagination page={page} pageSize={pageSize} total={data.total} onPage={setPage} onSize={setPageSize} />}</section>

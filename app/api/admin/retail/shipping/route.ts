@@ -4,7 +4,9 @@ import { rest, rpc } from "@/lib/supabase-server";
 import { isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 
 export async function GET() {
-  if (!(await getAdminSession())) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  const session = await getAdminSession();
+  if (!session) return NextResponse.json({ message: "请先登录。" }, { status: 401 });
+  if (!canManageStaff(session.role)) return NextResponse.json({ message: "无权查看配送规则。" }, { status: 403 });
   try { const { data } = await rest("retail_shipping_zones?select=*&order=country_name.asc"); return NextResponse.json({ data }); }
   catch { return NextResponse.json({ message: "无法读取配送区域。" }, { status: 503 }); }
 }

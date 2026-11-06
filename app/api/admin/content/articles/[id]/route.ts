@@ -54,8 +54,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ? current.data[0].status === "published" ? {} : { published_at: new Date().toISOString() }
       : { published_at: null };
     const payload = { title, slug, category_id: categoryId, article_type: types.includes(body.article_type) ? body.article_type : "news", excerpt: text(body.excerpt, 600) || null, content, cover_url: cover, cover_alt: text(body.cover_alt, 180) || null, attachment_url: mediaUrl(body.attachment_url), seo_title: text(body.seo_title, 180) || null, seo_description: text(body.seo_description, 320) || null, focus_keywords: text(body.focus_keywords, 500) || null, status, ...publication, updated_at: new Date().toISOString(), updated_by: session.accountId };
-    const result = await rest<Article[]>(`articles?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
-    if (!result.data[0]) return NextResponse.json({ message: "保存失败。" }, { status: 400 });
+    const result = await rest<Article[]>(`articles?id=eq.${id}&status=eq.${current.data[0].status}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(payload) });
+    if (!result.data[0]) return NextResponse.json({ message: "资讯状态已变化，请刷新后重试。" }, { status: 409 });
     await rpc("admin_log_audit", { p_actor_id: session.accountId, p_action: "article_updated", p_entity_type: "articles", p_entity_id: id, p_metadata: { status } }).catch(() => undefined);
     return NextResponse.json({ data: result.data[0] });
   } catch { return NextResponse.json({ message: "保存失败，请检查英文地址是否重复。" }, { status: 400 }); }

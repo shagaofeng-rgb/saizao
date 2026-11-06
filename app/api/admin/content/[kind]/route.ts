@@ -92,8 +92,9 @@ export async function PATCH(request:Request,{params}:{params:Promise<{kind:strin
   const publication = status === "published"
     ? current.data[0].status === "published" ? {} : { published_at: new Date().toISOString() }
     : { published_at: null };
-  const saved=await rest<Record<string,unknown>[]>(`${table}?id=eq.${encodeURIComponent(body.id)}`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({status,...publication,updated_at:new Date().toISOString(),updated_by:session.accountId})}).catch(()=>null);
-  if(!saved?.data[0]) return NextResponse.json({message:"更新失败。"},{status:400});
+  const saved=await rest<Record<string,unknown>[]>(`${table}?id=eq.${encodeURIComponent(body.id)}&status=eq.${current.data[0].status}`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify({status,...publication,updated_at:new Date().toISOString(),updated_by:session.accountId})}).catch(()=>null);
+  if(!saved) return NextResponse.json({message:"更新失败，请稍后重试。"},{status:503});
+  if(!saved.data[0]) return NextResponse.json({message:"内容状态已变化，请刷新后重试。"},{status:409});
   await rpc("admin_log_audit",{p_actor_id:session.accountId,p_action:"content_status_changed",p_entity_type:table,p_entity_id:body.id,p_metadata:{status}}).catch(()=>undefined);
   return NextResponse.json({ok:true,data:saved.data[0]});
 }

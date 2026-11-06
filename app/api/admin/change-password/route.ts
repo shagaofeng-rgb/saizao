@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { adminCookie, createAdminSessionValue, getAdminSession } from "@/lib/admin-session";
+import { adminCookie, createAdminSessionValue, getAdminPasswordSession } from "@/lib/admin-session";
 import { AdminAccount, hashAdminPassword, passwordPolicyMessage, verifyAdminPassword } from "@/lib/admin-credentials";
 import { fingerprint, isSameOrigin, requestBodyTooLarge } from "@/lib/request-security";
 import { rpc } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
-  const session = await getAdminSession();
+  const session = await getAdminPasswordSession();
   if (!session) return NextResponse.json({ message: "登录已失效，请重新登录。" }, { status: 401 });
   if (!isSameOrigin(request)) return NextResponse.json({ message: "请求校验失败。" }, { status: 403 });
   if (requestBodyTooLarge(request, 8_000)) return NextResponse.json({ message: "请求内容过大。" }, { status: 413 });
