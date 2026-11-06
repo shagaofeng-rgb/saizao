@@ -4,13 +4,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, CaretDown, List, ShoppingBag, X } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { applications, primaryNav } from "@/lib/site-data";
 import { readCart } from "@/lib/retail-cart";
 
+type NavigationMenu = "products" | "applications";
+
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<"products" | "applications" | null>(null);
+  const [activeMenu, setActiveMenu] = useState<NavigationMenu | null>(null);
   const [productCategories, setProductCategories] = useState<{ id: string; name: string; slug: string; parent_id: string | null }[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [categoriesUnavailable, setCategoriesUnavailable] = useState(false);
@@ -20,33 +22,42 @@ export function SiteHeader() {
   const navRef = useRef<HTMLElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const menuCloseTimer = useRef<number | null>(null);
+  const hoveredMenu = useRef<NavigationMenu | null>(null);
 
   const canHover = () => window.matchMedia("(min-width: 1191px) and (hover: hover) and (pointer: fine)").matches;
-  const clearMenuCloseTimer = () => {
+  const clearMenuCloseTimer = useCallback(() => {
     if (menuCloseTimer.current) window.clearTimeout(menuCloseTimer.current);
     menuCloseTimer.current = null;
-  };
-  const openMenu = (menu: "products" | "applications") => {
+  }, []);
+  const openMenu = (menu: NavigationMenu, fromHover = false) => {
     clearMenuCloseTimer();
+    hoveredMenu.current = fromHover ? menu : null;
     setActiveMenu(menu);
   };
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     clearMenuCloseTimer();
+    hoveredMenu.current = null;
     setActiveMenu(null);
+  }, [clearMenuCloseTimer]);
+  const toggleMenu = (menu: NavigationMenu, fromPointer: boolean) => {
+    const alreadyOpenedByPointer = fromPointer && hoveredMenu.current === menu;
+    clearMenuCloseTimer();
+    hoveredMenu.current = null;
+    setActiveMenu((current) => current === menu && !alreadyOpenedByPointer ? null : menu);
   };
-  const closeNavigation = () => {
+  const closeNavigation = useCallback(() => {
     setOpen(false);
     closeMenu();
-  };
+  }, [closeMenu]);
   const scheduleMenuClose = () => {
     if (!canHover()) return;
     clearMenuCloseTimer();
     menuCloseTimer.current = window.setTimeout(() => {
-      if (!headerRef.current?.querySelector(".mega-panel-open")?.contains(document.activeElement)) setActiveMenu(null);
+      if (!headerRef.current?.querySelector(".mega-panel-open")?.contains(document.activeElement)) closeMenu();
     }, 180);
   };
 
-  useEffect(() => () => clearMenuCloseTimer(), []);
+  useEffect(() => () => clearMenuCloseTimer(), [clearMenuCloseTimer]);
   useEffect(() => {
     const sync = () => setCartCount(readCart().reduce((sum, item) => sum + item.quantity, 0));
     sync(); window.addEventListener("saizhao-cart-change", sync); window.addEventListener("storage", sync);
@@ -77,7 +88,7 @@ export function SiteHeader() {
       if (event.key !== "Escape" || (!open && !headerRef.current?.contains(document.activeElement))) return;
       event.preventDefault();
       if (activeMenu) {
-        setActiveMenu(null);
+        closeMenu();
         headerRef.current?.querySelector<HTMLButtonElement>(`[aria-controls="${activeMenu}-menu"]`)?.focus();
       } else {
         setOpen(false);
@@ -86,8 +97,7 @@ export function SiteHeader() {
     };
     const closeOnOutsideClick = (event: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        setActiveMenu(null);
+        closeNavigation();
       }
     };
     window.addEventListener("keydown", closeOnEscape);
@@ -96,7 +106,7 @@ export function SiteHeader() {
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("mousedown", closeOnOutsideClick);
     };
-  }, [open, activeMenu]);
+  }, [open, activeMenu, closeMenu, closeNavigation]);
 
   useEffect(() => {
     if (!open) return;
@@ -120,8 +130,7 @@ export function SiteHeader() {
     const mobile = window.matchMedia("(max-width: 1190px)");
     const closeOnDesktop = () => {
       if (!mobile.matches) {
-        setOpen(false);
-        setActiveMenu(null);
+        closeNavigation();
       }
     };
     window.addEventListener("keydown", keepFocusInMenu);
@@ -131,7 +140,7 @@ export function SiteHeader() {
       window.removeEventListener("keydown", keepFocusInMenu);
       mobile.removeEventListener("change", closeOnDesktop);
     };
-  }, [open]);
+  }, [open, closeNavigation]);
 
   return (
     <header className="site-header" ref={headerRef}>
@@ -144,10 +153,10 @@ export function SiteHeader() {
       </button>
       <nav ref={navRef} id="primary-navigation" className={open ? "nav nav-open" : "nav"} aria-label="Primary navigation">
         {primaryNav.map((item) => item.href === "/applications" || item.href === "/products" ? (
-          <div className="nav-mega" key={item.href} onPointerEnter={() => { if (canHover()) openMenu(item.href === "/products" ? "products" : "applications"); }} onPointerLeave={scheduleMenuClose} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) closeMenu(); }}>
+          <div className="nav-mega" key={item.href} onPointerEnter={() => { if (!canHover()) return; clearMenuCloseTimer(); const menu = item.href === "/products" ? "products" : "applications"; if (activeMenu !== menu) openMenu(menu, true); }} onPointerLeave={scheduleMenuClose} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) closeMenu(); }}>
             <div className="nav-mega-trigger">
               <Link href={item.href} aria-current={pathname.startsWith(item.href) ? "page" : undefined} className={pathname.startsWith(item.href) ? "nav-active" : ""} onClick={closeNavigation}>{item.label}</Link>
-              <button type="button" aria-label={`${activeMenu === item.href.slice(1) ? "Close" : "Open"} ${item.label.toLowerCase()} menu`} aria-expanded={activeMenu === item.href.slice(1)} aria-controls={`${item.href.slice(1)}-menu`} onClick={() => { clearMenuCloseTimer(); const menu = item.href === "/products" ? "products" : "applications"; setActiveMenu((value) => value === menu ? null : menu); }}><CaretDown size={13} weight="bold" /></button>
+              <button type="button" aria-label={`${activeMenu === item.href.slice(1) ? "Close" : "Open"} ${item.label.toLowerCase()} menu`} aria-expanded={activeMenu === item.href.slice(1)} aria-controls={`${item.href.slice(1)}-menu`} onClick={(event) => toggleMenu(item.href === "/products" ? "products" : "applications", event.detail > 0)}><CaretDown size={13} weight="bold" /></button>
             </div>
             <div id={`${item.href.slice(1)}-menu`} className={activeMenu === item.href.slice(1) ? "mega-panel mega-panel-open" : "mega-panel"} onFocus={() => openMenu(item.href === "/products" ? "products" : "applications")}>
               <p>{item.href === "/products" ? "Explore the collection" : "Choose your product route"}</p>
